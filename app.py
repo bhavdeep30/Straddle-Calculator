@@ -362,7 +362,7 @@ def update_options_tables(n_clicks, ticker):
             current_price = current_data['Close'].iloc[-1]
         
         # Get options chain
-        calls_df, puts_df, exp_date = get_options_chain(ticker)
+        calls_df, puts_df, exp_date, all_expirations = get_options_chain(ticker)
         
         if calls_df is None or puts_df is None:
             return (
@@ -372,8 +372,11 @@ def update_options_tables(n_clicks, ticker):
                     html.H4(f"{ticker} - {stock.info.get('shortName', ticker)}", style={'color': colors['accent'], 'marginTop': '0'}),
                     html.P(f"Current Price: ${current_price:.2f}", style={'margin': '5px 0'})
                 ]),
-                html.Div("No expiration dates available"),
-                json.dumps({'price': current_price})
+                [],
+                None,
+                json.dumps({'price': current_price}),
+                None,
+                ticker
             )
         
         # Create interactive tables
