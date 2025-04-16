@@ -349,11 +349,22 @@ app.layout = html.Div(style={'backgroundColor': colors['background'], 'color': c
             # Strategy results
             html.Div(id='strategy-results', style={'marginBottom': '20px', 'padding': '15px', 'backgroundColor': colors['background'], 'borderRadius': '5px', 'border': f'1px solid {colors["secondary"]}'}),
             
-            # Profit/Loss graph
+            # Profit/Loss graph with improved config
             dcc.Graph(
                 id='profit-loss-graph',
-                config={'displayModeBar': False},
-                style={'backgroundColor': colors['background']}
+                config={
+                    'displayModeBar': True,
+                    'displaylogo': False,
+                    'modeBarButtonsToRemove': ['lasso2d', 'select2d'],
+                    'toImageButtonOptions': {
+                        'format': 'png',
+                        'filename': 'straddle_analysis',
+                        'height': 800,
+                        'width': 1200,
+                        'scale': 2
+                    }
+                },
+                style={'backgroundColor': colors['background'], 'height': '600px'}
             )
         ]),
     ]),
@@ -675,34 +686,69 @@ def update_results(n_clicks, call_data, put_data, stock_price_data, risk_free_ra
             'Profit/Loss': profits
         })
         
+        # Create a more focused price range for better visualization
+        # Zoom in to a more relevant range around the strikes and current price
+        price_range_min = max(0.1, min(current_price * 0.8, lower_breakeven * 0.9))
+        price_range_max = max(current_price * 1.2, upper_breakeven * 1.1)
+        price_range = np.linspace(price_range_min, price_range_max, 100)
+        
+        # Recalculate profits for the zoomed-in range
+        profits = []
+        for price in price_range:
+            # At expiration
+            if is_true_straddle:
+                call_profit = max(0, price - strike_price) - call_price
+                put_profit = max(0, strike_price - price) - put_price
+            else:
+                call_profit = max(0, price - call_strike_price) - call_price
+                put_profit = max(0, put_strike_price - price) - put_price
+                
+            total_profit = call_profit + put_profit
+            profits.append(total_profit)
+        
+        profit_df = pd.DataFrame({
+            'Stock Price': price_range,
+            'Profit/Loss': profits
+        })
+        
         # Create the profit/loss graph
         fig = go.Figure()
         
-        # Add profit/loss line
+        # Add profit/loss line with improved hover template
         fig.add_trace(go.Scatter(
             x=profit_df['Stock Price'],
             y=profit_df['Profit/Loss'],
             mode='lines',
             name='Profit/Loss',
-            line=dict(color=colors['accent'], width=3)
+            line=dict(color=colors['accent'], width=3),
+            hovertemplate='<b>Stock Price:</b> $%{x:.2f}<br><b>P/L:</b> $%{y:.2f}<extra></extra>'
         ))
         
-        # Add breakeven points
+        # Calculate profit at current price
+        current_price_profit = profit_df.loc[profit_df['Stock Price'].sub(current_price).abs().idxmin(), 'Profit/Loss']
+        
+        # Add breakeven points with annotations
         fig.add_trace(go.Scatter(
             x=[lower_breakeven, upper_breakeven],
             y=[0, 0],
-            mode='markers',
+            mode='markers+text',
             name='Breakeven Points',
-            marker=dict(color=colors['text'], size=10, symbol='diamond')
+            marker=dict(color=colors['text'], size=10, symbol='diamond'),
+            text=["Lower BE", "Upper BE"],
+            textposition="top center",
+            hovertemplate='<b>Breakeven:</b> $%{x:.2f}<extra></extra>'
         ))
         
-        # Add current price marker
+        # Add current price marker with annotation
         fig.add_trace(go.Scatter(
             x=[current_price],
-            y=[profit_df.loc[profit_df['Stock Price'].sub(current_price).abs().idxmin(), 'Profit/Loss']],
-            mode='markers',
+            y=[current_price_profit],
+            mode='markers+text',
             name='Current Price',
-            marker=dict(color=colors['accent'], size=12, symbol='circle')
+            marker=dict(color=colors['accent'], size=12, symbol='circle'),
+            text=["Current"],
+            textposition="top center",
+            hovertemplate='<b>Current Price:</b> $%{x:.2f}<br><b>P/L:</b> $%{y:.2f}<extra></extra>'
         ))
         
         # Add horizontal line at y=0
@@ -715,7 +761,7 @@ def update_results(n_clicks, call_data, put_data, stock_price_data, risk_free_ra
             line=dict(color=colors['secondary'], width=2, dash="dash")
         )
         
-        # Add vertical lines at strike prices
+        # Add vertical lines at strike prices with annotations
         if is_true_straddle:
             fig.add_shape(
                 type="line",
@@ -725,8 +771,24 @@ def update_results(n_clicks, call_data, put_data, stock_price_data, risk_free_ra
                 y1=max(profit_df['Profit/Loss']),
                 line=dict(color=colors['secondary'], width=2, dash="dash")
             )
+            
+            # Add annotation for strike price
+            fig.add_annotation(
+                x=strike_price,
+                y=min(profit_df['Profit/Loss']),
+                text=f"Strike: ${strike_price:.2f}",
+                showarrow=True,
+                arrowhead=1,
+                ax=0,
+                ay=40,
+                font=dict(color=colors['text'], size=12),
+                bgcolor=colors['panel'],
+                bordercolor=colors['secondary'],
+                borderwidth=1,
+                borderpad=4
+            )
         else:
-            # For strangle, add two vertical lines
+            # For strangle, add two vertical lines with annotations
             fig.add_shape(
                 type="line",
                 x0=call_strike_price,
@@ -735,6 +797,22 @@ def update_results(n_clicks, call_data, put_data, stock_price_data, risk_free_ra
                 y1=max(profit_df['Profit/Loss']),
                 line=dict(color=colors['profit'], width=2, dash="dash")
             )
+            
+            fig.add_annotation(
+                x=call_strike_price,
+                y=min(profit_df['Profit/Loss']),
+                text=f"Call Strike: ${call_strike_price:.2f}",
+                showarrow=True,
+                arrowhead=1,
+                ax=0,
+                ay=40,
+                font=dict(color=colors['profit'], size=12),
+                bgcolor=colors['panel'],
+                bordercolor=colors['secondary'],
+                borderwidth=1,
+                borderpad=4
+            )
+            
             fig.add_shape(
                 type="line",
                 x0=put_strike_price,
@@ -743,8 +821,70 @@ def update_results(n_clicks, call_data, put_data, stock_price_data, risk_free_ra
                 y1=max(profit_df['Profit/Loss']),
                 line=dict(color=colors['loss'], width=2, dash="dash")
             )
+            
+            fig.add_annotation(
+                x=put_strike_price,
+                y=min(profit_df['Profit/Loss']),
+                text=f"Put Strike: ${put_strike_price:.2f}",
+                showarrow=True,
+                arrowhead=1,
+                ax=0,
+                ay=40,
+                font=dict(color=colors['loss'], size=12),
+                bgcolor=colors['panel'],
+                bordercolor=colors['secondary'],
+                borderwidth=1,
+                borderpad=4
+            )
         
-        # Update layout
+        # Add annotations for breakeven points
+        fig.add_annotation(
+            x=lower_breakeven,
+            y=0,
+            text=f"Lower BE: ${lower_breakeven:.2f}",
+            showarrow=True,
+            arrowhead=1,
+            ax=0,
+            ay=-40,
+            font=dict(color=colors['text'], size=12),
+            bgcolor=colors['panel'],
+            bordercolor=colors['secondary'],
+            borderwidth=1,
+            borderpad=4
+        )
+        
+        fig.add_annotation(
+            x=upper_breakeven,
+            y=0,
+            text=f"Upper BE: ${upper_breakeven:.2f}",
+            showarrow=True,
+            arrowhead=1,
+            ax=0,
+            ay=-40,
+            font=dict(color=colors['text'], size=12),
+            bgcolor=colors['panel'],
+            bordercolor=colors['secondary'],
+            borderwidth=1,
+            borderpad=4
+        )
+        
+        # Add max loss annotation
+        fig.add_annotation(
+            x=(lower_breakeven + upper_breakeven) / 2 if is_true_straddle else (put_strike_price + call_strike_price) / 2,
+            y=-total_premium,
+            text=f"Max Loss: -${total_premium:.2f}",
+            showarrow=True,
+            arrowhead=1,
+            ax=0,
+            ay=20,
+            font=dict(color=colors['loss'], size=12),
+            bgcolor=colors['panel'],
+            bordercolor=colors['secondary'],
+            borderwidth=1,
+            borderpad=4
+        )
+        
+        # Update layout with improved settings
         fig.update_layout(
             title=f"{strategy_type} STRATEGY PROFIT/LOSS PROJECTION",
             xaxis_title="Stock Price at Expiration ($)",
@@ -754,17 +894,48 @@ def update_results(n_clicks, call_data, put_data, stock_price_data, risk_free_ra
             font=dict(color=colors['text']),
             legend=dict(
                 bgcolor=colors['panel'],
-                bordercolor=colors['secondary']
+                bordercolor=colors['secondary'],
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="center",
+                x=0.5
             ),
-            margin=dict(l=40, r=40, t=50, b=40),
-            hovermode="x unified",
+            margin=dict(l=40, r=40, t=80, b=40),
+            hovermode="closest",
             xaxis=dict(
                 gridcolor=colors['grid'],
-                zerolinecolor=colors['grid']
+                zerolinecolor=colors['grid'],
+                tickprefix="$",
+                tickformat=".2f",
+                showgrid=True,
+                showspikes=True,
+                spikemode="across",
+                spikesnap="cursor",
+                spikecolor=colors['accent'],
+                spikedash="solid",
+                spikecolor=colors['accent'],
+                spikethickness=1
             ),
             yaxis=dict(
                 gridcolor=colors['grid'],
-                zerolinecolor=colors['grid']
+                zerolinecolor=colors['grid'],
+                tickprefix="$",
+                tickformat=".2f",
+                showgrid=True,
+                showspikes=True,
+                spikemode="across",
+                spikesnap="cursor",
+                spikecolor=colors['accent'],
+                spikedash="solid",
+                spikecolor=colors['accent'],
+                spikethickness=1
+            ),
+            # Add a range slider for better navigation
+            xaxis_rangeslider=dict(
+                visible=True,
+                thickness=0.05,
+                bgcolor=colors['panel']
             )
         )
         
