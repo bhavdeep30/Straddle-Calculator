@@ -34,13 +34,24 @@ def black_scholes(S, K, T, r, sigma, option_type="call"):
     S: Current stock price
     K: Strike price
     T: Time to maturity in years
-    r: Risk-free interest rate
-    sigma: Volatility
+    r: Risk-free interest rate (as decimal, e.g., 0.05 for 5%)
+    sigma: Volatility (as decimal, e.g., 0.3 for 30%)
     option_type: "call" or "put"
     
     Returns:
     Option price
     """
+    # Handle edge cases
+    if T <= 0:
+        # At expiration
+        if option_type == "call":
+            return max(0, S - K)
+        else:  # put
+            return max(0, K - S)
+    
+    if sigma <= 0:
+        sigma = 0.001  # Avoid division by zero
+    
     d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
     d2 = d1 - sigma * np.sqrt(T)
     
@@ -49,7 +60,134 @@ def black_scholes(S, K, T, r, sigma, option_type="call"):
     else:  # put
         price = K * np.exp(-r * T) * norm.cdf(-d2) - S * norm.cdf(-d1)
     
-    return price
+    return max(0, price)  # Option price can't be negative
+
+# Calculate option Greeks
+def calculate_greeks(S, K, T, r, sigma, option_type="call"):
+    """
+    Calculate option Greeks using Black-Scholes model
+    
+    Parameters:
+    S: Current stock price
+    K: Strike price
+    T: Time to maturity in years
+    r: Risk-free interest rate (as decimal)
+    sigma: Volatility (as decimal)
+    option_type: "call" or "put"
+    
+    Returns:
+    Dictionary with Delta, Gamma, Theta, Vega, and Rho
+    """
+    if T <= 0:
+        return {
+            "delta": 1.0 if option_type == "call" and S > K else 0.0,
+            "gamma": 0.0,
+            "theta": 0.0,
+            "vega": 0.0,
+            "rho": 0.0
+        }
+    
+    if sigma <= 0:
+        sigma = 0.001  # Avoid division by zero
+    
+    d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
+    d2 = d1 - sigma * np.sqrt(T)
+    
+    # Calculate common terms
+    sqrt_t = np.sqrt(T)
+    nd1 = norm.pdf(d1)
+    
+    # Delta
+    if option_type == "call":
+        delta = norm.cdf(d1)
+    else:
+        delta = norm.cdf(d1) - 1
+    
+    # Gamma (same for calls and puts)
+    gamma = nd1 / (S * sigma * sqrt_t)
+    
+    # Theta
+    term1 = -S * nd1 * sigma / (2 * sqrt_t)
+    if option_type == "call":
+        term2 = -r * K * np.exp(-r * T) * norm.cdf(d2)
+        theta = term1 + term2
+    else:
+        term2 = r * K * np.exp(-r * T) * norm.cdf(-d2)
+        theta = term1 + term2
+    
+    # Vega (same for calls and puts)
+    vega = S * sqrt_t * nd1 / 100  # Divided by 100 to get change per 1% vol change
+    
+    # Rho
+    if option_type == "call":
+        rho = K * T * np.exp(-r * T) * norm.cdf(d2) / 100
+    else:
+        rho = -K * T * np.exp(-r * T) * norm.cdf(-d2) / 100
+    
+    return {
+        "delta": delta,
+        "gamma": gamma,
+        "theta": theta / 365,  # Daily theta
+        "vega": vega,
+        "rho": rho
+    }
+
+# Calculate theoretical future option prices for different stock prices
+def calculate_theoretical_prices(current_price, straddle_strike, straddle_put_strike, 
+                                strangle_call_strike, strangle_put_strike, days_to_expiry, 
+                                risk_free_rate, implied_volatility_call, implied_volatility_put, 
+                                price_range):
+    """
+    Calculate theoretical option prices for different stock prices
+    
+    Parameters:
+    current_price: Current stock price
+    straddle_strike: Strike price for straddle (both call and put)
+    straddle_put_strike: Strike price for straddle put (should be same as straddle_strike)
+    strangle_call_strike: Strike price for strangle call
+    strangle_put_strike: Strike price for strangle put
+    days_to_expiry: Days to expiration
+    risk_free_rate: Risk-free interest rate (as percentage)
+    implied_volatility_call: IV for call option (as percentage)
+    implied_volatility_put: IV for put option (as percentage)
+    price_range: Array of stock prices to calculate theoretical prices
+    
+    Returns:
+    DataFrame with stock prices and corresponding theoretical option prices
+    """
+    # Convert to decimal
+    r = risk_free_rate / 100
+    iv_call = implied_volatility_call / 100
+    iv_put = implied_volatility_put / 100
+    
+    # Convert days to years
+    T = max(0.0001, days_to_expiry / 365)
+    
+    theoretical_calls = []
+    theoretical_puts = []
+    
+    # Determine if it's a straddle or strangle
+    is_straddle = straddle_strike is not None
+    
+    if is_straddle:
+        call_strike = straddle_strike
+        put_strike = straddle_strike
+    else:
+        call_strike = strangle_call_strike
+        put_strike = strangle_put_strike
+    
+    for price in price_range:
+        call_price = black_scholes(price, call_strike, T, r, iv_call, "call")
+        put_price = black_scholes(price, put_strike, T, r, iv_put, "put")
+        
+        theoretical_calls.append(call_price)
+        theoretical_puts.append(put_price)
+    
+    return pd.DataFrame({
+        'Stock Price': price_range,
+        'Call Price': theoretical_calls,
+        'Put Price': theoretical_puts
+    })
 
 # Calculate straddle strategy profit at different stock prices
 def calculate_straddle_profit(current_price, strike_price, call_price, put_price, price_range):
@@ -205,6 +343,8 @@ def get_options_chain(ticker, selected_expiration=None):
 
 # App layout
 app.layout = html.Div(style={'backgroundColor': colors['background'], 'color': colors['text'], 'minHeight': '100vh', 'fontFamily': 'Arial, sans-serif'}, children=[
+    # Store for Black-Scholes calculations
+    dcc.Store(id='bs-calculations', storage_type='memory'),
     # Header
     html.Div(style={'padding': '20px', 'textAlign': 'center', 'borderBottom': f'1px solid {colors["secondary"]}'}, children=[
         html.H1("ULTRON STRADDLE STRATEGY ANALYZER", style={'color': colors['accent'], 'fontWeight': 'bold', 'letterSpacing': '2px'}),
@@ -216,6 +356,7 @@ app.layout = html.Div(style={'backgroundColor': colors['background'], 'color': c
     dcc.Store(id='selected-put', storage_type='memory'),
     dcc.Store(id='stock-price-store', storage_type='memory'),
     dcc.Store(id='current-ticker', storage_type='memory'),
+    dcc.Store(id='price-scenarios', storage_type='memory'),
     
     # Loading component
     dcc.Loading(
@@ -362,6 +503,47 @@ app.layout = html.Div(style={'backgroundColor': colors['background'], 'color': c
             
             # Strategy results
             html.Div(id='strategy-results', style={'marginBottom': '20px', 'padding': '15px', 'backgroundColor': colors['background'], 'borderRadius': '5px', 'border': f'1px solid {colors["secondary"]}'}),
+            
+            # Black-Scholes Pricing Scenarios
+            html.Div([
+                html.H4("BLACK-SCHOLES PRICING SCENARIOS", style={'color': colors['accent'], 'marginTop': '20px', 'marginBottom': '10px'}),
+                
+                # Date navigation for Black-Scholes
+                html.Div(style={'display': 'flex', 'alignItems': 'center', 'justifyContent': 'space-between', 'marginBottom': '15px'}, children=[
+                    html.Button(
+                        '◀ -7 DAYS',
+                        id='prev-date-button',
+                        style={
+                            'backgroundColor': colors['secondary'],
+                            'color': colors['text'],
+                            'border': 'none',
+                            'padding': '8px 15px',
+                            'borderRadius': '5px',
+                            'cursor': 'pointer',
+                            'fontWeight': 'bold',
+                            'width': '100px'
+                        }
+                    ),
+                    html.Div(id='bs-date-display', style={'color': colors['text'], 'fontWeight': 'bold', 'fontSize': '16px'}),
+                    html.Button(
+                        '+7 DAYS ▶',
+                        id='next-date-button',
+                        style={
+                            'backgroundColor': colors['secondary'],
+                            'color': colors['text'],
+                            'border': 'none',
+                            'padding': '8px 15px',
+                            'borderRadius': '5px',
+                            'cursor': 'pointer',
+                            'fontWeight': 'bold',
+                            'width': '100px'
+                        }
+                    ),
+                ]),
+                
+                # Black-Scholes pricing table
+                html.Div(id='bs-pricing-table', style={'marginBottom': '20px', 'overflowX': 'auto'}),
+            ], style={'marginBottom': '20px', 'padding': '15px', 'backgroundColor': colors['background'], 'borderRadius': '5px', 'border': f'1px solid {colors["secondary"]}'}),
             
             # Profit/Loss graph with improved config
             dcc.Graph(
@@ -628,22 +810,31 @@ def update_selected_options_display(call_data, put_data):
     
     return html.Div(selected_options)
 
-# Callback for strategy analysis
+# Callback for strategy analysis and Black-Scholes calculations
 @app.callback(
     [Output('strategy-results', 'children'),
-     Output('profit-loss-graph', 'figure')],
+     Output('profit-loss-graph', 'figure'),
+     Output('bs-calculations', 'data'),
+     Output('bs-date-display', 'children'),
+     Output('bs-pricing-table', 'children'),
+     Output('price-scenarios', 'data')],
     [Input('calculate-button', 'n_clicks')],
     [State('selected-call', 'data'),
      State('selected-put', 'data'),
      State('stock-price-store', 'data'),
-     State('risk-free-rate', 'value')]
+     State('risk-free-rate', 'value'),
+     State('current-expiry', 'data')]
 )
-def update_results(n_clicks, call_data, put_data, stock_price_data, risk_free_rate):
+def update_results(n_clicks, call_data, put_data, stock_price_data, risk_free_rate, expiry_date):
     if n_clicks == 0 or not call_data or not put_data or not stock_price_data:
         # Initial state or missing data
         return (
             html.P("Select both a call and put option, then click ANALYZE STRATEGY", style={'color': colors['secondary']}),
-            go.Figure()
+            go.Figure(),
+            None,
+            "Select options first",
+            html.Div("No data available"),
+            None
         )
     
     try:
@@ -652,7 +843,17 @@ def update_results(n_clicks, call_data, put_data, stock_price_data, risk_free_ra
         put_price = put_data['Last Price']
         call_strike = call_data['Strike']
         put_strike = put_data['Strike']
+        call_iv = call_data['IV']
+        put_iv = put_data['IV']
         current_price = json.loads(stock_price_data)['price']
+        
+        # Calculate days to expiration
+        if expiry_date:
+            expiry_date_obj = datetime.datetime.strptime(expiry_date, "%Y-%m-%d")
+            days_to_expiry = (expiry_date_obj - datetime.datetime.now()).days
+            days_to_expiry = max(0, days_to_expiry)  # Ensure non-negative
+        else:
+            days_to_expiry = 30  # Default if no expiry date
         
         # Check if we have a true straddle (same strike price)
         is_true_straddle = call_strike == put_strike
@@ -680,6 +881,56 @@ def update_results(n_clicks, call_data, put_data, stock_price_data, risk_free_ra
         price_range_min = max(0.1, current_price * 0.5)  # Avoid negative or zero prices
         price_range_max = current_price * 1.5
         price_range = np.linspace(price_range_min, price_range_max, 100)
+        
+        # Generate price scenarios for the table (fewer points for readability)
+        price_scenarios = np.linspace(price_range_min, price_range_max, 9)  # 9 price points
+        
+        # Calculate Black-Scholes theoretical prices for different dates
+        days_list = [max(0, days_to_expiry - 14), max(0, days_to_expiry - 7), days_to_expiry, 
+                    min(days_to_expiry + 7, 365), min(days_to_expiry + 14, 365)]
+        
+        bs_results = {}
+        for days in days_list:
+            # Calculate time to expiry in years
+            t_expiry = max(0.0001, days / 365)
+            
+            # Calculate theoretical prices for different stock prices
+            theoretical_prices = calculate_theoretical_prices(
+                current_price, 
+                call_strike if is_true_straddle else None,  # For true straddle
+                put_strike if is_true_straddle else None,   # For true straddle
+                call_strike if not is_true_straddle else None,  # For strangle
+                put_strike if not is_true_straddle else None,   # For strangle
+                days, 
+                risk_free_rate, 
+                call_iv, 
+                put_iv, 
+                price_scenarios
+            )
+            
+            bs_results[days] = theoretical_prices.to_dict('records')
+        
+        # Store Black-Scholes calculations for date navigation
+        bs_calculations = {
+            'current_days': days_to_expiry,
+            'days_list': days_list,
+            'results': bs_results,
+            'call_price': call_price,
+            'put_price': put_price,
+            'call_strike': call_strike,
+            'put_strike': put_strike,
+            'current_price': current_price,
+            'is_true_straddle': is_true_straddle
+        }
+        
+        # Create the Black-Scholes pricing table for the current date
+        bs_table = create_bs_pricing_table(bs_calculations, days_to_expiry)
+        
+        # Format the date display
+        if days_to_expiry == 0:
+            bs_date_display = "AT EXPIRATION"
+        else:
+            bs_date_display = f"{days_to_expiry} DAYS TO EXPIRY"
         
         # Calculate profit/loss for each price point
         profits = []
@@ -1034,14 +1285,176 @@ def update_results(n_clicks, call_data, put_data, stock_price_data, risk_free_ra
             ]),
         ])
         
-        return strategy_results, fig
+        return strategy_results, fig, bs_calculations, bs_date_display, bs_table, json.dumps(price_scenarios.tolist())
         
     except Exception as e:
         error_message = f"Error: {str(e)}"
+        print(f"Error in update_results: {error_message}")
         return (
             html.P(error_message, style={'color': colors['loss']}),
-            go.Figure()
+            go.Figure(),
+            None,
+            "Error",
+            html.Div(error_message, style={'color': colors['loss']}),
+            None
         )
+
+# Function to create Black-Scholes pricing table
+def create_bs_pricing_table(bs_calculations, days):
+    if not bs_calculations or days not in bs_calculations['days_list']:
+        return html.Div("No data available")
+    
+    # Get the data for the selected days
+    data = bs_calculations['results'][days]
+    call_price = bs_calculations['call_price']
+    put_price = bs_calculations['put_price']
+    current_price = bs_calculations['current_price']
+    is_true_straddle = bs_calculations['is_true_straddle']
+    
+    # Create the table header
+    header = html.Thead(html.Tr([
+        html.Th("Stock Price", style={'backgroundColor': colors['secondary'], 'color': colors['text'], 'padding': '10px', 'textAlign': 'center'}),
+        html.Th("Call Value", style={'backgroundColor': colors['secondary'], 'color': colors['text'], 'padding': '10px', 'textAlign': 'center'}),
+        html.Th("Put Value", style={'backgroundColor': colors['secondary'], 'color': colors['text'], 'padding': '10px', 'textAlign': 'center'}),
+        html.Th("Call P/L", style={'backgroundColor': colors['secondary'], 'color': colors['text'], 'padding': '10px', 'textAlign': 'center'}),
+        html.Th("Put P/L", style={'backgroundColor': colors['secondary'], 'color': colors['text'], 'padding': '10px', 'textAlign': 'center'}),
+        html.Th("Total P/L", style={'backgroundColor': colors['secondary'], 'color': colors['text'], 'padding': '10px', 'textAlign': 'center'}),
+        html.Th("Contract P/L", style={'backgroundColor': colors['secondary'], 'color': colors['text'], 'padding': '10px', 'textAlign': 'center'})
+    ]))
+    
+    # Create the table rows
+    rows = []
+    for item in data:
+        stock_price = item['Stock Price']
+        call_value = item['Call Price']
+        put_value = item['Put Price']
+        
+        # Calculate P/L
+        call_pl = call_value - call_price
+        put_pl = put_value - put_price
+        total_pl = call_pl + put_pl
+        contract_pl = total_pl * 100
+        
+        # Determine row style based on current price
+        row_style = {'backgroundColor': colors['accent'], 'color': colors['text']} if abs(stock_price - current_price) < 0.01 else {}
+        
+        # Determine P/L cell styles
+        call_pl_style = {'color': colors['profit'] if call_pl > 0 else colors['loss'] if call_pl < 0 else colors['text']}
+        put_pl_style = {'color': colors['profit'] if put_pl > 0 else colors['loss'] if put_pl < 0 else colors['text']}
+        total_pl_style = {'color': colors['profit'] if total_pl > 0 else colors['loss'] if total_pl < 0 else colors['text'], 'fontWeight': 'bold'}
+        contract_pl_style = {'color': colors['profit'] if contract_pl > 0 else colors['loss'] if contract_pl < 0 else colors['text'], 'fontWeight': 'bold'}
+        
+        row = html.Tr([
+            html.Td(f"${stock_price:.2f}", style={'padding': '8px', 'textAlign': 'center', **row_style}),
+            html.Td(f"${call_value:.2f}", style={'padding': '8px', 'textAlign': 'center', **row_style}),
+            html.Td(f"${put_value:.2f}", style={'padding': '8px', 'textAlign': 'center', **row_style}),
+            html.Td(f"${call_pl:.2f}", style={'padding': '8px', 'textAlign': 'center', **{**row_style, **call_pl_style}}),
+            html.Td(f"${put_pl:.2f}", style={'padding': '8px', 'textAlign': 'center', **{**row_style, **put_pl_style}}),
+            html.Td(f"${total_pl:.2f}", style={'padding': '8px', 'textAlign': 'center', **{**row_style, **total_pl_style}}),
+            html.Td(f"${contract_pl:.2f}", style={'padding': '8px', 'textAlign': 'center', **{**row_style, **contract_pl_style}})
+        ])
+        rows.append(row)
+    
+    # Create the table body
+    body = html.Tbody(rows)
+    
+    # Create the table
+    table = html.Table([header, body], style={
+        'width': '100%',
+        'borderCollapse': 'collapse',
+        'border': f'1px solid {colors["secondary"]}',
+        'backgroundColor': colors['background']
+    })
+    
+    return table
+
+# Callback for Black-Scholes date navigation (previous date)
+@app.callback(
+    [Output('bs-date-display', 'children', allow_duplicate=True),
+     Output('bs-pricing-table', 'children', allow_duplicate=True)],
+    [Input('prev-date-button', 'n_clicks')],
+    [State('bs-calculations', 'data'),
+     State('bs-date-display', 'children')],
+    prevent_initial_call=True
+)
+def navigate_to_prev_date(n_clicks, bs_calculations, current_display):
+    if not bs_calculations or not n_clicks:
+        return dash.no_update, dash.no_update
+    
+    try:
+        # Get current days
+        current_days = bs_calculations['current_days']
+        days_list = bs_calculations['days_list']
+        
+        # Find the previous date in the list
+        current_index = days_list.index(current_days)
+        if current_index > 0:
+            new_days = days_list[current_index - 1]
+        else:
+            # Already at the earliest date
+            return dash.no_update, dash.no_update
+        
+        # Update the display
+        if new_days == 0:
+            new_display = "AT EXPIRATION"
+        else:
+            new_display = f"{new_days} DAYS TO EXPIRY"
+        
+        # Create the new table
+        new_table = create_bs_pricing_table(bs_calculations, new_days)
+        
+        # Update the current days in the store
+        bs_calculations['current_days'] = new_days
+        
+        return new_display, new_table
+        
+    except Exception as e:
+        print(f"Error in navigate_to_prev_date: {str(e)}")
+        return dash.no_update, dash.no_update
+
+# Callback for Black-Scholes date navigation (next date)
+@app.callback(
+    [Output('bs-date-display', 'children', allow_duplicate=True),
+     Output('bs-pricing-table', 'children', allow_duplicate=True)],
+    [Input('next-date-button', 'n_clicks')],
+    [State('bs-calculations', 'data'),
+     State('bs-date-display', 'children')],
+    prevent_initial_call=True
+)
+def navigate_to_next_date(n_clicks, bs_calculations, current_display):
+    if not bs_calculations or not n_clicks:
+        return dash.no_update, dash.no_update
+    
+    try:
+        # Get current days
+        current_days = bs_calculations['current_days']
+        days_list = bs_calculations['days_list']
+        
+        # Find the next date in the list
+        current_index = days_list.index(current_days)
+        if current_index < len(days_list) - 1:
+            new_days = days_list[current_index + 1]
+        else:
+            # Already at the latest date
+            return dash.no_update, dash.no_update
+        
+        # Update the display
+        if new_days == 0:
+            new_display = "AT EXPIRATION"
+        else:
+            new_display = f"{new_days} DAYS TO EXPIRY"
+        
+        # Create the new table
+        new_table = create_bs_pricing_table(bs_calculations, new_days)
+        
+        # Update the current days in the store
+        bs_calculations['current_days'] = new_days
+        
+        return new_display, new_table
+        
+    except Exception as e:
+        print(f"Error in navigate_to_next_date: {str(e)}")
+        return dash.no_update, dash.no_update
 
 # Callback for previous expiration button
 @app.callback(
