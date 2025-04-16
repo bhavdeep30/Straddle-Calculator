@@ -201,6 +201,7 @@ app.layout = html.Div(style={'backgroundColor': colors['background'], 'color': c
     dcc.Store(id='selected-call', storage_type='memory'),
     dcc.Store(id='selected-put', storage_type='memory'),
     dcc.Store(id='stock-price-store', storage_type='memory'),
+    dcc.Store(id='current-ticker', storage_type='memory'),
     
     # Loading component
     dcc.Loading(
@@ -364,8 +365,6 @@ app.layout = html.Div(style={'backgroundColor': colors['background'], 'color': c
     ])
 ])
 
-# Store for current ticker
-dcc.Store(id='current-ticker', storage_type='memory'),
 
 # Callback to fetch options and display tables
 @app.callback(
