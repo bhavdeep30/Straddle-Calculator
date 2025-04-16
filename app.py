@@ -111,8 +111,17 @@ def get_options_chain(ticker, selected_expiration=None):
     calls_df, puts_df, exp_date, all_expirations, current_price
     """
     try:
-        # Create ticker object
+        # Normalize ticker
+        ticker = ticker.strip().upper()
+        
+        # Create ticker object with force_refresh to avoid cached data
         ticker_obj = yf.Ticker(ticker)
+        
+        # Get current price first to ensure connection works
+        hist = ticker_obj.history(period="1d")
+        if hist.empty:
+            raise ValueError(f"Could not retrieve price data for {ticker}")
+        current_price = hist['Close'].iloc[-1]
         
         # Get available expiration dates
         expirations = ticker_obj.options
@@ -123,11 +132,18 @@ def get_options_chain(ticker, selected_expiration=None):
         # Use selected expiration or default to first available
         exp_date = selected_expiration if selected_expiration in expirations else expirations[0]
         
-        # Get options for this expiration
-        options = ticker_obj.option_chain(exp_date)
-        
-        # Get current price
-        current_price = ticker_obj.history(period="1d")['Close'].iloc[-1]
+        # Get options for this expiration with a retry mechanism
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                options = ticker_obj.option_chain(exp_date)
+                break
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    raise ValueError(f"Failed to fetch option chain after {max_retries} attempts: {e}")
+                print(f"Retry {attempt+1}/{max_retries} fetching options for {ticker}")
+                import time
+                time.sleep(1)  # Wait before retrying
         
         # Format the data
         calls = options.calls
@@ -136,12 +152,25 @@ def get_options_chain(ticker, selected_expiration=None):
         if calls.empty or puts.empty:
             raise ValueError(f"No options chain data available for {ticker} on {exp_date}")
         
-        # Format the data
-        calls = calls[['strike', 'lastPrice', 'bid', 'ask', 'impliedVolatility', 'inTheMoney']]
+        # Format the data - handle potential missing columns gracefully
+        required_columns = ['strike', 'lastPrice', 'bid', 'ask', 'impliedVolatility', 'inTheMoney']
+        
+        # Check if all required columns exist
+        for col in required_columns:
+            if col not in calls.columns or col not in puts.columns:
+                print(f"Warning: Missing column {col} in options data")
+                # Create the column with default values if missing
+                if col not in calls.columns:
+                    calls[col] = 0.0
+                if col not in puts.columns:
+                    puts[col] = 0.0
+        
+        # Now safely select the columns
+        calls = calls[required_columns]
         calls.columns = ['Strike', 'Last Price', 'Bid', 'Ask', 'IV', 'ITM']
         calls['IV'] = (calls['IV'] * 100).round(2)
         
-        puts = puts[['strike', 'lastPrice', 'bid', 'ask', 'impliedVolatility', 'inTheMoney']]
+        puts = puts[required_columns]
         puts.columns = ['Strike', 'Last Price', 'Bid', 'Ask', 'IV', 'ITM']
         puts['IV'] = (puts['IV'] * 100).round(2)
         
@@ -156,7 +185,9 @@ def get_options_chain(ticker, selected_expiration=None):
         return calls, puts, exp_date, expirations, current_price, exp_date_formatted, prev_exp, next_exp
     except Exception as e:
         print(f"Error fetching options for {ticker}: {e}")
-        return None, None, None, None, None, None, None, None
+        # Return more detailed error information
+        error_msg = str(e)
+        return None, None, None, None, None, f"Error: {error_msg}", None, None
 
 # App layout
 app.layout = html.Div(style={'backgroundColor': colors['background'], 'color': colors['text'], 'minHeight': '100vh', 'fontFamily': 'Arial, sans-serif'}, children=[
@@ -372,24 +403,28 @@ def update_options_tables(n_clicks, ticker):
         )
     
     try:
+        # Show loading message
+        loading_message = html.Div("Fetching options data...", style={'color': colors['text']})
+        
         # Normalize ticker
         ticker = ticker.strip().upper()
         
-        # Get options chain with simplified approach
+        # Get options chain with improved approach
         calls_df, puts_df, exp_date, all_expirations, current_price, exp_date_formatted, prev_exp, next_exp = get_options_chain(ticker)
         
         if calls_df is None or puts_df is None:
+            error_message = exp_date_formatted if isinstance(exp_date_formatted, str) and exp_date_formatted.startswith("Error") else "Could not retrieve options data"
             return (
                 html.Div("No options data available", style={'color': colors['loss']}),
                 html.Div("No options data available", style={'color': colors['loss']}),
                 html.Div([
                     html.H4(f"{ticker}", style={'color': colors['accent'], 'marginTop': '0'}),
-                    html.P("Could not retrieve options data", style={'margin': '5px 0', 'color': colors['loss']})
+                    html.P(error_message, style={'margin': '5px 0', 'color': colors['loss']})
                 ]),
                 "No expiration dates available",
                 None,
                 None,
-                None,
+                ticker,
                 None,
                 None,
                 None,
@@ -1063,4 +1098,8 @@ def go_to_next_expiration(n_clicks, next_exp, ticker, all_expiries_json):
 
 # Run the app
 if __name__ == '__main__':
+    # Add a startup message to help with troubleshooting
+    print("Starting Ultron Straddle Strategy Analyzer...")
+    print("Using yfinance version:", yf.__version__)
+    print("Make sure you have an active internet connection to fetch options data")
     app.run_server(debug=True)
