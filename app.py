@@ -101,29 +101,21 @@ def calculate_breakeven_points(strike_price, total_premium):
 # Function to get options chain for a ticker
 def get_options_chain(ticker, selected_expiration=None):
     """
-    Get options chain for a ticker
+    Get options chain for a ticker using minimal yfinance calls
     
     Parameters:
     ticker: Stock ticker symbol
     selected_expiration: Optional specific expiration date to fetch
     
     Returns:
-    calls_df, puts_df, exp_date, all_expirations
+    calls_df, puts_df, exp_date, all_expirations, current_price
     """
     try:
-        # Normalize ticker symbol (uppercase and strip whitespace)
-        ticker = ticker.strip().upper()
-        
         # Create ticker object
-        stock = yf.Ticker(ticker)
-        
-        # Verify we can get data for this ticker
-        info = stock.info
-        if not info or 'regularMarketPrice' not in info:
-            raise ValueError(f"Could not retrieve data for ticker {ticker}")
+        ticker_obj = yf.Ticker(ticker)
         
         # Get available expiration dates
-        expirations = stock.options
+        expirations = ticker_obj.options
         
         if not expirations or len(expirations) == 0:
             raise ValueError(f"No options data available for {ticker}")
@@ -132,7 +124,12 @@ def get_options_chain(ticker, selected_expiration=None):
         exp_date = selected_expiration if selected_expiration in expirations else expirations[0]
         
         # Get options for this expiration
-        options = stock.option_chain(exp_date)
+        options = ticker_obj.option_chain(exp_date)
+        
+        # Get current price
+        current_price = ticker_obj.history(period="1d")['Close'].iloc[-1]
+        
+        # Format the data
         calls = options.calls
         puts = options.puts
         
@@ -148,16 +145,18 @@ def get_options_chain(ticker, selected_expiration=None):
         puts.columns = ['Strike', 'Last Price', 'Bid', 'Ask', 'IV', 'ITM']
         puts['IV'] = (puts['IV'] * 100).round(2)
         
-        # Format expiration dates for dropdown
-        formatted_expirations = [
-            {'label': datetime.datetime.strptime(date, "%Y-%m-%d").strftime("%b %d, %Y"), 'value': date}
-            for date in expirations
-        ]
+        # Get expiration index
+        current_exp_index = expirations.index(exp_date)
+        prev_exp = expirations[current_exp_index - 1] if current_exp_index > 0 else None
+        next_exp = expirations[current_exp_index + 1] if current_exp_index < len(expirations) - 1 else None
         
-        return calls, puts, exp_date, formatted_expirations
+        # Format expiration dates for display
+        exp_date_formatted = datetime.datetime.strptime(exp_date, "%Y-%m-%d").strftime("%B %d, %Y")
+        
+        return calls, puts, exp_date, expirations, current_price, exp_date_formatted, prev_exp, next_exp
     except Exception as e:
         print(f"Error fetching options for {ticker}: {e}")
-        return None, None, None, None
+        return None, None, None, None, None, None, None, None
 
 # App layout
 app.layout = html.Div(style={'backgroundColor': colors['background'], 'color': colors['text'], 'minHeight': '100vh', 'fontFamily': 'Arial, sans-serif'}, children=[
@@ -256,20 +255,44 @@ app.layout = html.Div(style={'backgroundColor': colors['background'], 'color': c
         html.Div(style={'flex': '2', 'minWidth': '500px', 'backgroundColor': colors['panel'], 'padding': '20px', 'borderRadius': '10px', 'margin': '10px'}, children=[
             html.H3("OPTIONS CHAIN", style={'color': colors['accent'], 'borderBottom': f'1px solid {colors["secondary"]}', 'paddingBottom': '10px'}),
             
-            # Expiration date selector
-            html.Div(style={'marginBottom': '15px'}, children=[
-                html.Label("EXPIRATION DATE", style={'fontWeight': 'bold', 'marginBottom': '5px', 'display': 'block', 'color': colors['text']}),
-                dcc.Dropdown(
-                    id='expiration-dropdown',
-                    options=[],
+            # Expiration date navigation
+            html.Div(style={'display': 'flex', 'alignItems': 'center', 'justifyContent': 'space-between', 'marginBottom': '15px'}, children=[
+                html.Button(
+                    '◀ PREV',
+                    id='prev-expiry-button',
                     style={
-                        'backgroundColor': colors['background'],
+                        'backgroundColor': colors['secondary'],
                         'color': colors['text'],
-                        'border': f'1px solid {colors["secondary"]}',
-                        'borderRadius': '5px'
+                        'border': 'none',
+                        'padding': '8px 15px',
+                        'borderRadius': '5px',
+                        'cursor': 'pointer',
+                        'fontWeight': 'bold',
+                        'width': '100px'
+                    }
+                ),
+                html.Div(id='expiration-display', style={'color': colors['text'], 'fontWeight': 'bold', 'fontSize': '16px'}),
+                html.Button(
+                    'NEXT ▶',
+                    id='next-expiry-button',
+                    style={
+                        'backgroundColor': colors['secondary'],
+                        'color': colors['text'],
+                        'border': 'none',
+                        'padding': '8px 15px',
+                        'borderRadius': '5px',
+                        'cursor': 'pointer',
+                        'fontWeight': 'bold',
+                        'width': '100px'
                     }
                 ),
             ]),
+            
+            # Store components for expiration navigation
+            dcc.Store(id='prev-expiry', storage_type='memory'),
+            dcc.Store(id='current-expiry', storage_type='memory'),
+            dcc.Store(id='next-expiry', storage_type='memory'),
+            dcc.Store(id='all-expiries', storage_type='memory'),
             
             # Options tables
             html.Div(style={'display': 'flex', 'flexWrap': 'wrap', 'gap': '20px'}, children=[
@@ -318,24 +341,33 @@ dcc.Store(id='current-ticker', storage_type='memory'),
     [Output('calls-table-container', 'children'),
      Output('puts-table-container', 'children'),
      Output('stock-info', 'children'),
-     Output('expiration-dropdown', 'options'),
-     Output('expiration-dropdown', 'value'),
+     Output('expiration-display', 'children'),
      Output('stock-price-store', 'data'),
      Output('loading-output', 'children'),
-     Output('current-ticker', 'data')],
+     Output('current-ticker', 'data'),
+     Output('prev-expiry', 'data'),
+     Output('current-expiry', 'data'),
+     Output('next-expiry', 'data'),
+     Output('all-expiries', 'data')],
     [Input('fetch-options-button', 'n_clicks')],
     [State('ticker-input', 'value')]
 )
 def update_options_tables(n_clicks, ticker):
     if n_clicks is None:
-        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
     
     if not ticker or ticker.strip() == "":
         return (
             html.Div("Please enter a valid ticker symbol", style={'color': colors['loss']}),
             html.Div("Please enter a valid ticker symbol", style={'color': colors['loss']}),
             html.Div("No stock data available", style={'color': colors['loss']}),
-            html.Div("No expiration dates available"),
+            "No expiration dates available",
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
             None
         )
     
@@ -343,40 +375,25 @@ def update_options_tables(n_clicks, ticker):
         # Normalize ticker
         ticker = ticker.strip().upper()
         
-        # Get stock info
-        stock = yf.Ticker(ticker)
-        
-        # Try to get info first to validate ticker
-        info = stock.info
-        if not info or 'regularMarketPrice' not in info:
-            raise ValueError(f"No data found for ticker {ticker}")
-            
-        # Get current price
-        current_price = info.get('regularMarketPrice', None)
-        
-        # If we couldn't get price from info, try history
-        if current_price is None:
-            current_data = stock.history(period="1d")
-            if current_data.empty:
-                raise ValueError(f"No price data found for ticker {ticker}")
-            current_price = current_data['Close'].iloc[-1]
-        
-        # Get options chain
-        calls_df, puts_df, exp_date, all_expirations = get_options_chain(ticker)
+        # Get options chain with simplified approach
+        calls_df, puts_df, exp_date, all_expirations, current_price, exp_date_formatted, prev_exp, next_exp = get_options_chain(ticker)
         
         if calls_df is None or puts_df is None:
             return (
                 html.Div("No options data available", style={'color': colors['loss']}),
                 html.Div("No options data available", style={'color': colors['loss']}),
                 html.Div([
-                    html.H4(f"{ticker} - {stock.info.get('shortName', ticker)}", style={'color': colors['accent'], 'marginTop': '0'}),
-                    html.P(f"Current Price: ${current_price:.2f}", style={'margin': '5px 0'})
+                    html.H4(f"{ticker}", style={'color': colors['accent'], 'marginTop': '0'}),
+                    html.P("Could not retrieve options data", style={'margin': '5px 0', 'color': colors['loss']})
                 ]),
-                [],
+                "No expiration dates available",
                 None,
-                json.dumps({'price': current_price}),
                 None,
-                ticker
+                None,
+                None,
+                None,
+                None,
+                None
             )
         
         # Create interactive tables
@@ -456,21 +473,28 @@ def update_options_tables(n_clicks, ticker):
         
         # Stock info display
         stock_info = html.Div([
-            html.H4(f"{ticker} - {stock.info.get('shortName', ticker)}", style={'color': colors['accent'], 'marginTop': '0'}),
+            html.H4(f"{ticker}", style={'color': colors['accent'], 'marginTop': '0'}),
             html.Div(style={'display': 'flex', 'justifyContent': 'space-between'}, children=[
                 html.Div([
                     html.P("CURRENT PRICE:", style={'margin': '5px 0', 'fontWeight': 'bold'}),
                     html.P(f"${current_price:.2f}", style={'margin': '5px 0', 'fontSize': '18px'})
-                ]),
-                html.Div([
-                    html.P("MARKET CAP:", style={'margin': '5px 0', 'fontWeight': 'bold'}),
-                    html.P(f"${stock.info.get('marketCap', 'N/A') / 1e9:.2f}B" if 'marketCap' in stock.info else "N/A", 
-                           style={'margin': '5px 0', 'fontSize': '18px'})
                 ])
             ])
         ])
         
-        return calls_table, puts_table, stock_info, all_expirations, exp_date, json.dumps({'price': current_price}), None, ticker
+        return (
+            calls_table, 
+            puts_table, 
+            stock_info, 
+            exp_date_formatted,
+            json.dumps({'price': current_price}), 
+            None, 
+            ticker,
+            prev_exp,
+            exp_date,
+            next_exp,
+            json.dumps(all_expirations)
+        )
         
     except Exception as e:
         error_message = f"Error: {str(e)}"
@@ -775,28 +799,45 @@ def update_results(n_clicks, call_data, put_data, stock_price_data, risk_free_ra
             go.Figure()
         )
 
-# Callback to update options tables when expiration date changes
+# Callback for previous expiration button
 @app.callback(
     [Output('calls-table-container', 'children', allow_duplicate=True),
      Output('puts-table-container', 'children', allow_duplicate=True),
+     Output('expiration-display', 'children', allow_duplicate=True),
+     Output('prev-expiry', 'data', allow_duplicate=True),
+     Output('current-expiry', 'data', allow_duplicate=True),
+     Output('next-expiry', 'data', allow_duplicate=True),
      Output('selected-call', 'data', allow_duplicate=True),
      Output('selected-put', 'data', allow_duplicate=True)],
-    [Input('expiration-dropdown', 'value')],
-    [State('current-ticker', 'data')],
+    [Input('prev-expiry-button', 'n_clicks')],
+    [State('prev-expiry', 'data'),
+     State('current-ticker', 'data'),
+     State('all-expiries', 'data')],
     prevent_initial_call=True
 )
-def update_expiration_date(selected_expiration, ticker):
-    if not selected_expiration or not ticker:
-        return dash.no_update, dash.no_update, dash.no_update, dash.no_update
+def go_to_prev_expiration(n_clicks, prev_exp, ticker, all_expiries_json):
+    if not prev_exp or not ticker:
+        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
     
     try:
+        all_expiries = json.loads(all_expiries_json)
+        current_index = all_expiries.index(prev_exp)
+        
+        # Calculate new navigation indices
+        new_prev = all_expiries[current_index - 1] if current_index > 0 else None
+        new_next = all_expiries[current_index + 1] if current_index < len(all_expiries) - 1 else None
+        
         # Get options chain for the selected expiration
-        calls_df, puts_df, _, _ = get_options_chain(ticker, selected_expiration)
+        calls_df, puts_df, _, _, _, exp_date_formatted, _, _ = get_options_chain(ticker, prev_exp)
         
         if calls_df is None or puts_df is None:
             return (
                 html.Div("No options data available for this date", style={'color': colors['loss']}),
                 html.Div("No options data available for this date", style={'color': colors['loss']}),
+                "No data available",
+                new_prev,
+                prev_exp,
+                new_next,
                 None,
                 None
             )
@@ -876,13 +917,146 @@ def update_expiration_date(selected_expiration, ticker):
             page_size=10
         )
         
-        return calls_table, puts_table, None, None
+        return calls_table, puts_table, exp_date_formatted, new_prev, prev_exp, new_next, None, None
         
     except Exception as e:
         error_message = f"Error: {str(e)}"
         return (
             html.Div(error_message, style={'color': colors['loss']}),
             html.Div(error_message, style={'color': colors['loss']}),
+            None,
+            None
+        )
+
+# Callback for next expiration button
+@app.callback(
+    [Output('calls-table-container', 'children', allow_duplicate=True),
+     Output('puts-table-container', 'children', allow_duplicate=True),
+     Output('expiration-display', 'children', allow_duplicate=True),
+     Output('prev-expiry', 'data', allow_duplicate=True),
+     Output('current-expiry', 'data', allow_duplicate=True),
+     Output('next-expiry', 'data', allow_duplicate=True),
+     Output('selected-call', 'data', allow_duplicate=True),
+     Output('selected-put', 'data', allow_duplicate=True)],
+    [Input('next-expiry-button', 'n_clicks')],
+    [State('next-expiry', 'data'),
+     State('current-ticker', 'data'),
+     State('all-expiries', 'data')],
+    prevent_initial_call=True
+)
+def go_to_next_expiration(n_clicks, next_exp, ticker, all_expiries_json):
+    if not next_exp or not ticker:
+        return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
+    
+    try:
+        all_expiries = json.loads(all_expiries_json)
+        current_index = all_expiries.index(next_exp)
+        
+        # Calculate new navigation indices
+        new_prev = all_expiries[current_index - 1] if current_index > 0 else None
+        new_next = all_expiries[current_index + 1] if current_index < len(all_expiries) - 1 else None
+        
+        # Get options chain for the selected expiration
+        calls_df, puts_df, _, _, _, exp_date_formatted, _, _ = get_options_chain(ticker, next_exp)
+        
+        if calls_df is None or puts_df is None:
+            return (
+                html.Div("No options data available for this date", style={'color': colors['loss']}),
+                html.Div("No options data available for this date", style={'color': colors['loss']}),
+                "No data available",
+                new_prev,
+                next_exp,
+                new_next,
+                None,
+                None
+            )
+        
+        # Create interactive tables
+        calls_table = dash_table.DataTable(
+            id='calls-table',
+            columns=[
+                {"name": col, "id": col} for col in calls_df.columns
+            ],
+            data=calls_df.to_dict('records'),
+            style_header={
+                'backgroundColor': colors['secondary'],
+                'color': colors['text'],
+                'fontWeight': 'bold',
+                'textAlign': 'center'
+            },
+            style_cell={
+                'backgroundColor': colors['background'],
+                'color': colors['text'],
+                'textAlign': 'center',
+                'padding': '10px',
+                'minWidth': '70px'
+            },
+            style_data_conditional=[
+                {
+                    'if': {'column_id': 'ITM', 'filter_query': '{ITM} eq True'},
+                    'backgroundColor': 'rgba(0, 255, 127, 0.2)',
+                    'color': colors['profit']
+                },
+                {
+                    'if': {'state': 'selected'},
+                    'backgroundColor': colors['accent'],
+                    'color': colors['text'],
+                    'border': f'1px solid {colors["text"]}'
+                }
+            ],
+            row_selectable='single',
+            selected_rows=[],
+            page_size=10
+        )
+        
+        puts_table = dash_table.DataTable(
+            id='puts-table',
+            columns=[
+                {"name": col, "id": col} for col in puts_df.columns
+            ],
+            data=puts_df.to_dict('records'),
+            style_header={
+                'backgroundColor': colors['secondary'],
+                'color': colors['text'],
+                'fontWeight': 'bold',
+                'textAlign': 'center'
+            },
+            style_cell={
+                'backgroundColor': colors['background'],
+                'color': colors['text'],
+                'textAlign': 'center',
+                'padding': '10px',
+                'minWidth': '70px'
+            },
+            style_data_conditional=[
+                {
+                    'if': {'column_id': 'ITM', 'filter_query': '{ITM} eq True'},
+                    'backgroundColor': 'rgba(255, 71, 87, 0.2)',
+                    'color': colors['loss']
+                },
+                {
+                    'if': {'state': 'selected'},
+                    'backgroundColor': colors['accent'],
+                    'color': colors['text'],
+                    'border': f'1px solid {colors["text"]}'
+                }
+            ],
+            row_selectable='single',
+            selected_rows=[],
+            page_size=10
+        )
+        
+        return calls_table, puts_table, exp_date_formatted, new_prev, next_exp, new_next, None, None
+        
+    except Exception as e:
+        error_message = f"Error: {str(e)}"
+        return (
+            html.Div(error_message, style={'color': colors['loss']}),
+            html.Div(error_message, style={'color': colors['loss']}),
+            error_message,
+            dash.no_update,
+            dash.no_update,
+            dash.no_update,
             None,
             None
         )
