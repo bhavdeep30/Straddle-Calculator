@@ -637,13 +637,38 @@ def update_options_tables(n_clicks, ticker):
                 None
             )
         
+        # Find the closest strikes to current price
+        closest_call_idx = (calls_df['Strike'] - current_price).abs().idxmin()
+        closest_put_idx = (puts_df['Strike'] - current_price).abs().idxmin()
+        
+        # Sort the dataframes by strike price
+        calls_df = calls_df.sort_values('Strike')
+        puts_df = puts_df.sort_values('Strike')
+        
+        # Get 5 strikes above and below the closest strike
+        call_start_idx = max(0, closest_call_idx - 5)
+        call_end_idx = min(len(calls_df) - 1, closest_call_idx + 5)
+        put_start_idx = max(0, closest_put_idx - 5)
+        put_end_idx = min(len(puts_df) - 1, closest_put_idx + 5)
+        
+        # Filter the dataframes to show options around current price
+        visible_calls_df = calls_df.iloc[call_start_idx:call_end_idx + 1].copy()
+        visible_puts_df = puts_df.iloc[put_start_idx:put_end_idx + 1].copy()
+        
+        # Add a column to highlight the row closest to current price
+        visible_calls_df['Near Current'] = False
+        visible_calls_df.loc[closest_call_idx, 'Near Current'] = True
+        
+        visible_puts_df['Near Current'] = False
+        visible_puts_df.loc[closest_put_idx, 'Near Current'] = True
+        
         # Create interactive tables
         calls_table = dash_table.DataTable(
             id='calls-table',
             columns=[
-                {"name": col, "id": col} for col in calls_df.columns
+                {"name": col, "id": col} for col in visible_calls_df.columns if col != 'Near Current'
             ],
-            data=calls_df.to_dict('records'),
+            data=visible_calls_df.to_dict('records'),
             style_header={
                 'backgroundColor': colors['secondary'],
                 'color': colors['text'],
@@ -668,19 +693,25 @@ def update_options_tables(n_clicks, ticker):
                     'backgroundColor': colors['accent'],
                     'color': colors['text'],
                     'border': f'1px solid {colors["text"]}'
+                },
+                {
+                    'if': {'filter_query': '{Near Current} eq true'},
+                    'backgroundColor': colors['secondary'],
+                    'fontWeight': 'bold'
                 }
             ],
             row_selectable='single',
             selected_rows=[],
-            page_size=10
+            page_action='none',  # No pagination to show all visible options
+            style_table={'height': '400px', 'overflowY': 'auto'}
         )
         
         puts_table = dash_table.DataTable(
             id='puts-table',
             columns=[
-                {"name": col, "id": col} for col in puts_df.columns
+                {"name": col, "id": col} for col in visible_puts_df.columns if col != 'Near Current'
             ],
-            data=puts_df.to_dict('records'),
+            data=visible_puts_df.to_dict('records'),
             style_header={
                 'backgroundColor': colors['secondary'],
                 'color': colors['text'],
@@ -705,20 +736,33 @@ def update_options_tables(n_clicks, ticker):
                     'backgroundColor': colors['accent'],
                     'color': colors['text'],
                     'border': f'1px solid {colors["text"]}'
+                },
+                {
+                    'if': {'filter_query': '{Near Current} eq true'},
+                    'backgroundColor': colors['secondary'],
+                    'fontWeight': 'bold'
                 }
             ],
             row_selectable='single',
             selected_rows=[],
-            page_size=10
+            page_action='none',  # No pagination to show all visible options
+            style_table={'height': '400px', 'overflowY': 'auto'}
         )
         
-        # Stock info display
+        # Stock info display with current price highlighted
         stock_info = html.Div([
             html.H4(f"{ticker}", style={'color': colors['accent'], 'marginTop': '0'}),
             html.Div(style={'display': 'flex', 'justifyContent': 'space-between'}, children=[
                 html.Div([
                     html.P("CURRENT PRICE:", style={'margin': '5px 0', 'fontWeight': 'bold'}),
-                    html.P(f"${current_price:.2f}", style={'margin': '5px 0', 'fontSize': '18px'})
+                    html.P(f"${current_price:.2f}", style={
+                        'margin': '5px 0', 
+                        'fontSize': '18px',
+                        'backgroundColor': colors['secondary'],
+                        'padding': '5px 10px',
+                        'borderRadius': '5px',
+                        'display': 'inline-block'
+                    })
                 ])
             ])
         ])
@@ -1485,7 +1529,7 @@ def go_to_prev_expiration(n_clicks, prev_exp, ticker, all_expiries_json):
         new_next = all_expiries[current_index + 1] if current_index < len(all_expiries) - 1 else None
         
         # Get options chain for the selected expiration
-        calls_df, puts_df, _, _, _, exp_date_formatted, _, _ = get_options_chain(ticker, prev_exp)
+        calls_df, puts_df, _, _, current_price, exp_date_formatted, _, _ = get_options_chain(ticker, prev_exp)
         
         if calls_df is None or puts_df is None:
             return (
@@ -1499,13 +1543,38 @@ def go_to_prev_expiration(n_clicks, prev_exp, ticker, all_expiries_json):
                 None
             )
         
+        # Find the closest strikes to current price
+        closest_call_idx = (calls_df['Strike'] - current_price).abs().idxmin()
+        closest_put_idx = (puts_df['Strike'] - current_price).abs().idxmin()
+        
+        # Sort the dataframes by strike price
+        calls_df = calls_df.sort_values('Strike')
+        puts_df = puts_df.sort_values('Strike')
+        
+        # Get 5 strikes above and below the closest strike
+        call_start_idx = max(0, closest_call_idx - 5)
+        call_end_idx = min(len(calls_df) - 1, closest_call_idx + 5)
+        put_start_idx = max(0, closest_put_idx - 5)
+        put_end_idx = min(len(puts_df) - 1, closest_put_idx + 5)
+        
+        # Filter the dataframes to show options around current price
+        visible_calls_df = calls_df.iloc[call_start_idx:call_end_idx + 1].copy()
+        visible_puts_df = puts_df.iloc[put_start_idx:put_end_idx + 1].copy()
+        
+        # Add a column to highlight the row closest to current price
+        visible_calls_df['Near Current'] = False
+        visible_calls_df.iloc[(visible_calls_df['Strike'] - current_price).abs().idxmin()] = True
+        
+        visible_puts_df['Near Current'] = False
+        visible_puts_df.iloc[(visible_puts_df['Strike'] - current_price).abs().idxmin()] = True
+        
         # Create interactive tables
         calls_table = dash_table.DataTable(
             id='calls-table',
             columns=[
-                {"name": col, "id": col} for col in calls_df.columns
+                {"name": col, "id": col} for col in visible_calls_df.columns if col != 'Near Current'
             ],
-            data=calls_df.to_dict('records'),
+            data=visible_calls_df.to_dict('records'),
             style_header={
                 'backgroundColor': colors['secondary'],
                 'color': colors['text'],
@@ -1530,11 +1599,17 @@ def go_to_prev_expiration(n_clicks, prev_exp, ticker, all_expiries_json):
                     'backgroundColor': colors['accent'],
                     'color': colors['text'],
                     'border': f'1px solid {colors["text"]}'
+                },
+                {
+                    'if': {'filter_query': '{Near Current} eq true'},
+                    'backgroundColor': colors['secondary'],
+                    'fontWeight': 'bold'
                 }
             ],
             row_selectable='single',
             selected_rows=[],
-            page_size=10
+            page_action='none',  # No pagination to show all visible options
+            style_table={'height': '400px', 'overflowY': 'auto'}
         )
         
         puts_table = dash_table.DataTable(
@@ -1542,7 +1617,7 @@ def go_to_prev_expiration(n_clicks, prev_exp, ticker, all_expiries_json):
             columns=[
                 {"name": col, "id": col} for col in puts_df.columns
             ],
-            data=puts_df.to_dict('records'),
+            data=visible_puts_df.to_dict('records'),
             style_header={
                 'backgroundColor': colors['secondary'],
                 'color': colors['text'],
@@ -1567,11 +1642,17 @@ def go_to_prev_expiration(n_clicks, prev_exp, ticker, all_expiries_json):
                     'backgroundColor': colors['accent'],
                     'color': colors['text'],
                     'border': f'1px solid {colors["text"]}'
+                },
+                {
+                    'if': {'filter_query': '{Near Current} eq true'},
+                    'backgroundColor': colors['secondary'],
+                    'fontWeight': 'bold'
                 }
             ],
             row_selectable='single',
             selected_rows=[],
-            page_size=10
+            page_action='none',  # No pagination to show all visible options
+            style_table={'height': '400px', 'overflowY': 'auto'}
         )
         
         return calls_table, puts_table, exp_date_formatted, new_prev, prev_exp, new_next, None, None
@@ -1614,7 +1695,7 @@ def go_to_next_expiration(n_clicks, next_exp, ticker, all_expiries_json):
         new_next = all_expiries[current_index + 1] if current_index < len(all_expiries) - 1 else None
         
         # Get options chain for the selected expiration
-        calls_df, puts_df, _, _, _, exp_date_formatted, _, _ = get_options_chain(ticker, next_exp)
+        calls_df, puts_df, _, _, current_price, exp_date_formatted, _, _ = get_options_chain(ticker, next_exp)
         
         if calls_df is None or puts_df is None:
             return (
