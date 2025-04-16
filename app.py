@@ -914,7 +914,6 @@ def update_results(n_clicks, call_data, put_data, stock_price_data, risk_free_ra
                 spikesnap="cursor",
                 spikecolor=colors['accent'],
                 spikedash="solid",
-                spikecolor=colors['accent'],
                 spikethickness=1
             ),
             yaxis=dict(
@@ -928,7 +927,6 @@ def update_results(n_clicks, call_data, put_data, stock_price_data, risk_free_ra
                 spikesnap="cursor",
                 spikecolor=colors['accent'],
                 spikedash="solid",
-                spikecolor=colors['accent'],
                 spikethickness=1
             ),
             # Add a range slider for better navigation
