@@ -1629,10 +1629,12 @@ def go_to_prev_expiration(n_clicks, prev_exp, ticker, all_expiries_json):
         
         # Add a column to highlight the row closest to current price
         visible_calls_df['Near Current'] = False
-        visible_calls_df.iloc[(visible_calls_df['Strike'] - current_price).abs().idxmin()] = True
+        closest_visible_call_idx = (visible_calls_df['Strike'] - current_price).abs().idxmin()
+        visible_calls_df.loc[closest_visible_call_idx, 'Near Current'] = True
         
         visible_puts_df['Near Current'] = False
-        visible_puts_df.iloc[(visible_puts_df['Strike'] - current_price).abs().idxmin()] = True
+        closest_visible_put_idx = (visible_puts_df['Strike'] - current_price).abs().idxmin()
+        visible_puts_df.loc[closest_visible_put_idx, 'Near Current'] = True
         
         # Create interactive tables
         calls_table = dash_table.DataTable(
@@ -1795,10 +1797,12 @@ def go_to_next_expiration(n_clicks, next_exp, ticker, all_expiries_json):
         
         # Add a column to highlight the row closest to current price
         visible_calls_df['Near Current'] = False
-        visible_calls_df.iloc[(visible_calls_df['Strike'] - current_price).abs().idxmin()] = True
+        closest_visible_call_idx = (visible_calls_df['Strike'] - current_price).abs().idxmin()
+        visible_calls_df.loc[closest_visible_call_idx, 'Near Current'] = True
         
         visible_puts_df['Near Current'] = False
-        visible_puts_df.iloc[(visible_puts_df['Strike'] - current_price).abs().idxmin()] = True
+        closest_visible_put_idx = (visible_puts_df['Strike'] - current_price).abs().idxmin()
+        visible_puts_df.loc[closest_visible_put_idx, 'Near Current'] = True
         
         # Create interactive tables
         calls_table = dash_table.DataTable(
