@@ -1381,8 +1381,8 @@ def create_bs_pricing_table(bs_calculations, days):
     is_true_straddle = bs_calculations['is_true_straddle']
     expiry_date = bs_calculations.get('expiry_date')
     
-    # Sort data by stock price
-    data = sorted(data, key=lambda x: x['Stock Price'])
+    # Sort data by stock price in descending order (high to low)
+    data = sorted(data, key=lambda x: x['Stock Price'], reverse=True)
     
     # Create the table header
     header = html.Thead(html.Tr([
