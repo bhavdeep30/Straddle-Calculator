@@ -1395,12 +1395,58 @@ def create_bs_pricing_table(bs_calculations, days):
         html.Th("Contract P/L", style={'backgroundColor': colors['secondary'], 'color': colors['text'], 'padding': '10px', 'textAlign': 'center'})
     ]))
     
+    # Get breakeven points
+    if is_true_straddle:
+        call_strike = bs_calculations['call_strike']
+        total_premium = call_price + put_price
+        lower_breakeven = call_strike - total_premium
+        upper_breakeven = call_strike + total_premium
+    else:
+        call_strike = bs_calculations['call_strike']
+        put_strike = bs_calculations['put_strike']
+        lower_breakeven = put_strike - put_price
+        upper_breakeven = call_strike + call_price
+    
     # Create the table rows
     rows = []
+    
+    # Add breakeven rows if they're not already in the data
+    breakeven_prices = [lower_breakeven, upper_breakeven]
+    stock_prices = [item['Stock Price'] for item in data]
+    
+    # Add breakeven rows if they're not already in the data
+    for be_price in breakeven_prices:
+        # Check if this breakeven price is already in our data
+        if not any(abs(price - be_price) < 0.01 for price in stock_prices):
+            # Calculate theoretical values at breakeven
+            t_expiry = max(0.0001, days / 365)
+            r = bs_calculations.get('risk_free_rate', 4.5) / 100
+            iv_call = bs_calculations.get('call_iv', 30) / 100
+            iv_put = bs_calculations.get('put_iv', 30) / 100
+            
+            if is_true_straddle:
+                be_call_value = black_scholes(be_price, call_strike, t_expiry, r, iv_call, "call")
+                be_put_value = black_scholes(be_price, call_strike, t_expiry, r, iv_put, "put")
+            else:
+                be_call_value = black_scholes(be_price, call_strike, t_expiry, r, iv_call, "call")
+                be_put_value = black_scholes(be_price, put_strike, t_expiry, r, iv_put, "put")
+            
+            # Add to data
+            data.append({
+                'Stock Price': be_price,
+                'Call Price': be_call_value,
+                'Put Price': be_put_value,
+                'is_breakeven': True
+            })
+    
+    # Sort data by stock price after adding breakeven points
+    data = sorted(data, key=lambda x: x['Stock Price'])
+    
     for item in data:
         stock_price = item['Stock Price']
         call_value = item['Call Price']
         put_value = item['Put Price']
+        is_breakeven = item.get('is_breakeven', False)
         
         # Calculate P/L
         call_pl = call_value - call_price
@@ -1408,8 +1454,12 @@ def create_bs_pricing_table(bs_calculations, days):
         total_pl = call_pl + put_pl
         contract_pl = total_pl * 100
         
-        # Determine row style based on current price - highlight current price row more prominently
-        if abs(stock_price - current_price) < 0.01:
+        # Determine row style based on price type
+        if is_breakeven:
+            # Breakeven point - highlight in a distinct way
+            row_style = {'backgroundColor': colors['secondary'], 'color': colors['text'], 'fontWeight': 'bold', 'borderTop': f'2px solid {colors["accent"]}', 'borderBottom': f'2px solid {colors["accent"]}'}
+        elif abs(stock_price - current_price) < 0.01:
+            # Current price
             row_style = {'backgroundColor': colors['accent'], 'color': colors['text'], 'fontWeight': 'bold'}
         elif abs(stock_price - current_price) < current_price * 0.02:  # Within 2% of current price
             row_style = {'backgroundColor': colors['panel'], 'color': colors['text']}
@@ -1446,6 +1496,14 @@ def create_bs_pricing_table(bs_calculations, days):
                 'padding': '3px 8px',
                 'borderRadius': '3px',
                 'marginLeft': '5px'
+            }),
+            html.Span(" | Total Premium Paid: ", style={'fontWeight': 'bold', 'marginLeft': '10px'}),
+            html.Span(f"${call_price + put_price:.2f}/share (${(call_price + put_price) * 100:.2f}/contract)", style={
+                'backgroundColor': colors['loss'],
+                'color': colors['text'],
+                'padding': '3px 8px',
+                'borderRadius': '3px',
+                'marginLeft': '5px'
             })
         ], style={'marginBottom': '5px', 'textAlign': 'center'}),
         
@@ -1465,6 +1523,24 @@ def create_bs_pricing_table(bs_calculations, days):
                 'padding': '3px 8px',
                 'borderRadius': '3px',
                 'marginLeft': '5px'
+            })
+        ], style={'marginBottom': '5px', 'textAlign': 'center'}),
+        
+        html.Div([
+            html.Span("Breakeven Points: ", style={'fontWeight': 'bold'}),
+            html.Span(f"Lower: ${lower_breakeven:.2f}", style={
+                'backgroundColor': colors['secondary'],
+                'color': colors['text'],
+                'padding': '3px 8px',
+                'borderRadius': '3px',
+                'marginLeft': '5px'
+            }),
+            html.Span(f"Upper: ${upper_breakeven:.2f}", style={
+                'backgroundColor': colors['secondary'],
+                'color': colors['text'],
+                'padding': '3px 8px',
+                'borderRadius': '3px',
+                'marginLeft': '10px'
             })
         ], style={'marginBottom': '10px', 'textAlign': 'center'}),
         
