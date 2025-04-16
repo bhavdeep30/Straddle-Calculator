@@ -926,8 +926,18 @@ def update_results(n_clicks, call_data, put_data, stock_price_data, risk_free_ra
         price_range_max = current_price * 1.5
         price_range = np.linspace(price_range_min, price_range_max, 100)
         
-        # Generate price scenarios for the table (fewer points for readability)
-        price_scenarios = np.linspace(price_range_min, price_range_max, 9)  # 9 price points
+        # Generate price scenarios for the table focused around current price
+        # Create a tighter range around current price for the table
+        table_range_min = max(0.1, current_price * 0.9)  # 10% below current price
+        table_range_max = current_price * 1.1  # 10% above current price
+        
+        # Create more points near the current price
+        lower_range = np.linspace(table_range_min, current_price * 0.98, 3)
+        middle_range = np.linspace(current_price * 0.99, current_price * 1.01, 5)  # More points around current price
+        upper_range = np.linspace(current_price * 1.02, table_range_max, 3)
+        
+        # Combine the ranges
+        price_scenarios = np.unique(np.concatenate([lower_range, middle_range, upper_range]))
         
         # Calculate Black-Scholes theoretical prices for different dates
         days_list = [max(0, days_to_expiry - 14), max(0, days_to_expiry - 7), days_to_expiry, 
@@ -1355,6 +1365,9 @@ def create_bs_pricing_table(bs_calculations, days):
     current_price = bs_calculations['current_price']
     is_true_straddle = bs_calculations['is_true_straddle']
     
+    # Sort data by stock price
+    data = sorted(data, key=lambda x: x['Stock Price'])
+    
     # Create the table header
     header = html.Thead(html.Tr([
         html.Th("Stock Price", style={'backgroundColor': colors['secondary'], 'color': colors['text'], 'padding': '10px', 'textAlign': 'center'}),
@@ -1379,8 +1392,13 @@ def create_bs_pricing_table(bs_calculations, days):
         total_pl = call_pl + put_pl
         contract_pl = total_pl * 100
         
-        # Determine row style based on current price
-        row_style = {'backgroundColor': colors['accent'], 'color': colors['text']} if abs(stock_price - current_price) < 0.01 else {}
+        # Determine row style based on current price - highlight current price row more prominently
+        if abs(stock_price - current_price) < 0.01:
+            row_style = {'backgroundColor': colors['accent'], 'color': colors['text'], 'fontWeight': 'bold'}
+        elif abs(stock_price - current_price) < current_price * 0.02:  # Within 2% of current price
+            row_style = {'backgroundColor': colors['panel'], 'color': colors['text']}
+        else:
+            row_style = {}
         
         # Determine P/L cell styles
         call_pl_style = {'color': colors['profit'] if call_pl > 0 else colors['loss'] if call_pl < 0 else colors['text']}
@@ -1402,13 +1420,28 @@ def create_bs_pricing_table(bs_calculations, days):
     # Create the table body
     body = html.Tbody(rows)
     
-    # Create the table
-    table = html.Table([header, body], style={
-        'width': '100%',
-        'borderCollapse': 'collapse',
-        'border': f'1px solid {colors["secondary"]}',
-        'backgroundColor': colors['background']
-    })
+    # Create the table with a title showing the current price
+    table_container = html.Div([
+        html.Div([
+            html.Span("Current Price: ", style={'fontWeight': 'bold'}),
+            html.Span(f"${current_price:.2f}", style={
+                'backgroundColor': colors['accent'],
+                'color': colors['text'],
+                'padding': '3px 8px',
+                'borderRadius': '3px',
+                'marginLeft': '5px'
+            })
+        ], style={'marginBottom': '10px', 'textAlign': 'center'}),
+        
+        html.Table([header, body], style={
+            'width': '100%',
+            'borderCollapse': 'collapse',
+            'border': f'1px solid {colors["secondary"]}',
+            'backgroundColor': colors['background']
+        })
+    ])
+    
+    return table_container
     
     return table
 
