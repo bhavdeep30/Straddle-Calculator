@@ -862,12 +862,12 @@ def update_selected_options_display(call_data, put_data):
      Output('bs-date-display', 'children'),
      Output('bs-pricing-table', 'children'),
      Output('price-scenarios', 'data')],
-    [Input('calculate-button', 'n_clicks')],
+    [Input('calculate-button', 'n_clicks'),
+     Input('current-expiry', 'data')],  # Also trigger on expiry date change
     [State('selected-call', 'data'),
      State('selected-put', 'data'),
      State('stock-price-store', 'data'),
-     State('risk-free-rate', 'value'),
-     State('current-expiry', 'data')]
+     State('risk-free-rate', 'value')]
 )
 def update_results(n_clicks, expiry_date, call_data, put_data, stock_price_data, risk_free_rate):
     # Get the triggered input
