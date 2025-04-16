@@ -1389,9 +1389,10 @@ def create_bs_pricing_table(bs_calculations, days):
         html.Th("Stock Price", style={'backgroundColor': colors['secondary'], 'color': colors['text'], 'padding': '10px', 'textAlign': 'center'}),
         html.Th("Call Value", style={'backgroundColor': colors['secondary'], 'color': colors['text'], 'padding': '10px', 'textAlign': 'center'}),
         html.Th("Put Value", style={'backgroundColor': colors['secondary'], 'color': colors['text'], 'padding': '10px', 'textAlign': 'center'}),
-        html.Th("Call P/L", style={'backgroundColor': colors['secondary'], 'color': colors['text'], 'padding': '10px', 'textAlign': 'center'}),
-        html.Th("Put P/L", style={'backgroundColor': colors['secondary'], 'color': colors['text'], 'padding': '10px', 'textAlign': 'center'}),
-        html.Th("Total P/L", style={'backgroundColor': colors['secondary'], 'color': colors['text'], 'padding': '10px', 'textAlign': 'center'}),
+        html.Th("Call Contract Value", style={'backgroundColor': colors['secondary'], 'color': colors['text'], 'padding': '10px', 'textAlign': 'center'}),
+        html.Th("Put Contract Value", style={'backgroundColor': colors['secondary'], 'color': colors['text'], 'padding': '10px', 'textAlign': 'center'}),
+        html.Th("Total Contract Value", style={'backgroundColor': colors['secondary'], 'color': colors['text'], 'padding': '10px', 'textAlign': 'center'}),
+        html.Th(f"Total Premium (${(call_price + put_price) * 100:.2f})", style={'backgroundColor': colors['secondary'], 'color': colors['text'], 'padding': '10px', 'textAlign': 'center'}),
         html.Th("Contract P/L", style={'backgroundColor': colors['secondary'], 'color': colors['text'], 'padding': '10px', 'textAlign': 'center'})
     ]))
     
@@ -1418,14 +1419,15 @@ def create_bs_pricing_table(bs_calculations, days):
         call_value = item['Call Price']
         put_value = item['Put Price']
         
-        # Calculate P/L
-        call_pl = call_value - call_price
-        put_pl = put_value - put_price
-        total_pl = call_pl + put_pl
-        contract_pl = total_pl * 100
+        # Calculate values and P/L
+        call_contract_value = call_value * 100
+        put_contract_value = put_value * 100
+        total_contract_value = call_contract_value + put_contract_value
+        total_premium = (call_price + put_price) * 100
+        contract_pl = total_contract_value - total_premium
         
         # Determine row style based on price type
-        if abs(contract_pl) < 0.01:  # Contract P/L is close to zero (breakeven point)
+        if abs(contract_pl) < 1.0:  # Contract P/L is close to zero (breakeven point) - using 1.0 for contract value
             # Breakeven point - highlight in a distinct way
             row_style = {'backgroundColor': colors['secondary'], 'color': colors['text'], 'fontWeight': 'bold', 'borderTop': f'2px solid {colors["accent"]}', 'borderBottom': f'2px solid {colors["accent"]}'}
         elif abs(stock_price - current_price) < 0.01:
@@ -1436,19 +1438,22 @@ def create_bs_pricing_table(bs_calculations, days):
         else:
             row_style = {}
         
-        # Determine P/L cell styles
-        call_pl_style = {'color': colors['profit'] if call_pl > 0 else colors['loss'] if call_pl < 0 else colors['text']}
-        put_pl_style = {'color': colors['profit'] if put_pl > 0 else colors['loss'] if put_pl < 0 else colors['text']}
-        total_pl_style = {'color': colors['profit'] if total_pl > 0 else colors['loss'] if total_pl < 0 else colors['text'], 'fontWeight': 'bold'}
+        # Determine cell styles
+        call_value_style = {'color': colors['profit'] if call_value > call_price else colors['loss'] if call_value < call_price else colors['text']}
+        put_value_style = {'color': colors['profit'] if put_value > put_price else colors['loss'] if put_value < put_price else colors['text']}
+        call_contract_style = {'color': colors['profit'] if call_contract_value > call_price * 100 else colors['loss'] if call_contract_value < call_price * 100 else colors['text']}
+        put_contract_style = {'color': colors['profit'] if put_contract_value > put_price * 100 else colors['loss'] if put_contract_value < put_price * 100 else colors['text']}
+        total_contract_style = {'color': colors['profit'] if total_contract_value > total_premium else colors['loss'] if total_contract_value < total_premium else colors['text']}
         contract_pl_style = {'color': colors['profit'] if contract_pl > 0 else colors['loss'] if contract_pl < 0 else colors['text'], 'fontWeight': 'bold'}
         
         row = html.Tr([
             html.Td(f"${stock_price:.2f}", style={'padding': '8px', 'textAlign': 'center', **row_style}),
-            html.Td(f"${call_value:.2f}", style={'padding': '8px', 'textAlign': 'center', **row_style}),
-            html.Td(f"${put_value:.2f}", style={'padding': '8px', 'textAlign': 'center', **row_style}),
-            html.Td(f"${call_pl:.2f}", style={'padding': '8px', 'textAlign': 'center', **{**row_style, **call_pl_style}}),
-            html.Td(f"${put_pl:.2f}", style={'padding': '8px', 'textAlign': 'center', **{**row_style, **put_pl_style}}),
-            html.Td(f"${total_pl:.2f}", style={'padding': '8px', 'textAlign': 'center', **{**row_style, **total_pl_style}}),
+            html.Td(f"${call_value:.2f}", style={'padding': '8px', 'textAlign': 'center', **{**row_style, **call_value_style}}),
+            html.Td(f"${put_value:.2f}", style={'padding': '8px', 'textAlign': 'center', **{**row_style, **put_value_style}}),
+            html.Td(f"${call_contract_value:.2f}", style={'padding': '8px', 'textAlign': 'center', **{**row_style, **call_contract_style}}),
+            html.Td(f"${put_contract_value:.2f}", style={'padding': '8px', 'textAlign': 'center', **{**row_style, **put_contract_style}}),
+            html.Td(f"${total_contract_value:.2f}", style={'padding': '8px', 'textAlign': 'center', **{**row_style, **total_contract_style}}),
+            html.Td(f"${total_premium:.2f}", style={'padding': '8px', 'textAlign': 'center', **row_style}),
             html.Td(f"${contract_pl:.2f}", style={'padding': '8px', 'textAlign': 'center', **{**row_style, **contract_pl_style}})
         ])
         rows.append(row)
