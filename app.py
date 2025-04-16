@@ -69,16 +69,30 @@ def calculate_straddle_profit(current_price, strike_price, call_price, put_price
     total_premium = call_price + put_price
     
     profits = []
+    call_profits = []
+    put_profits = []
+    contract_profits = []
+    
     for price in price_range:
         # At expiration
         call_profit = max(0, price - strike_price) - call_price
         put_profit = max(0, strike_price - price) - put_price
         total_profit = call_profit + put_profit
+        
+        # Calculate contract value (multiply by 100)
+        contract_profit = total_profit * 100
+        
         profits.append(total_profit)
+        call_profits.append(call_profit)
+        put_profits.append(put_profit)
+        contract_profits.append(contract_profit)
     
     return pd.DataFrame({
         'Stock Price': price_range,
-        'Profit/Loss': profits
+        'Profit/Loss': profits,
+        'Call P/L': call_profits,
+        'Put P/L': put_profits,
+        'Contract P/L': contract_profits
     })
 
 # Calculate breakeven points for straddle
@@ -694,6 +708,10 @@ def update_results(n_clicks, call_data, put_data, stock_price_data, risk_free_ra
         
         # Recalculate profits for the zoomed-in range
         profits = []
+        call_profits = []
+        put_profits = []
+        contract_profits = []
+        
         for price in price_range:
             # At expiration
             if is_true_straddle:
@@ -704,11 +722,19 @@ def update_results(n_clicks, call_data, put_data, stock_price_data, risk_free_ra
                 put_profit = max(0, put_strike_price - price) - put_price
                 
             total_profit = call_profit + put_profit
+            contract_profit = total_profit * 100
+            
             profits.append(total_profit)
+            call_profits.append(call_profit)
+            put_profits.append(put_profit)
+            contract_profits.append(contract_profit)
         
         profit_df = pd.DataFrame({
             'Stock Price': price_range,
-            'Profit/Loss': profits
+            'Profit/Loss': profits,
+            'Call P/L': call_profits,
+            'Put P/L': put_profits,
+            'Contract P/L': contract_profits
         })
         
         # Create the profit/loss graph
@@ -721,7 +747,12 @@ def update_results(n_clicks, call_data, put_data, stock_price_data, risk_free_ra
             mode='lines',
             name='Profit/Loss',
             line=dict(color=colors['accent'], width=3),
-            hovertemplate='<b>Stock Price:</b> $%{x:.2f}<br><b>P/L:</b> $%{y:.2f}<extra></extra>'
+            hovertemplate='<b>Stock Price:</b> $%{x:.2f}<br>' +
+                          '<b>P/L per Share:</b> $%{y:.2f}<br>' +
+                          '<b>Call P/L:</b> $%{customdata[0]:.2f}<br>' +
+                          '<b>Put P/L:</b> $%{customdata[1]:.2f}<br>' +
+                          '<b>P/L per Contract:</b> $%{customdata[2]:.2f}<extra></extra>',
+            customdata=np.column_stack((profit_df['Call P/L'], profit_df['Put P/L'], profit_df['Contract P/L']))
         ))
         
         # Calculate profit at current price
@@ -736,8 +767,14 @@ def update_results(n_clicks, call_data, put_data, stock_price_data, risk_free_ra
             marker=dict(color=colors['text'], size=10, symbol='diamond'),
             text=["Lower BE", "Upper BE"],
             textposition="top center",
-            hovertemplate='<b>Breakeven:</b> $%{x:.2f}<extra></extra>'
+            hovertemplate='<b>Breakeven:</b> $%{x:.2f}<br><b>P/L:</b> $0.00<br><b>P/L per Contract:</b> $0.00<extra></extra>'
         ))
+        
+        # Calculate current price P/L components
+        current_idx = profit_df['Stock Price'].sub(current_price).abs().idxmin()
+        current_call_pl = profit_df.loc[current_idx, 'Call P/L']
+        current_put_pl = profit_df.loc[current_idx, 'Put P/L']
+        current_contract_pl = profit_df.loc[current_idx, 'Contract P/L']
         
         # Add current price marker with annotation
         fig.add_trace(go.Scatter(
@@ -748,7 +785,11 @@ def update_results(n_clicks, call_data, put_data, stock_price_data, risk_free_ra
             marker=dict(color=colors['accent'], size=12, symbol='circle'),
             text=["Current"],
             textposition="top center",
-            hovertemplate='<b>Current Price:</b> $%{x:.2f}<br><b>P/L:</b> $%{y:.2f}<extra></extra>'
+            hovertemplate='<b>Current Price:</b> $%{x:.2f}<br>' +
+                          '<b>P/L per Share:</b> $%{y:.2f}<br>' +
+                          '<b>Call P/L:</b> $' + f"{current_call_pl:.2f}" + '<br>' +
+                          '<b>Put P/L:</b> $' + f"{current_put_pl:.2f}" + '<br>' +
+                          '<b>P/L per Contract:</b> $' + f"{current_contract_pl:.2f}" + '<extra></extra>'
         ))
         
         # Add horizontal line at y=0
