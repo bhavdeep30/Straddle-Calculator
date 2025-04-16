@@ -1410,8 +1410,8 @@ def create_bs_pricing_table(bs_calculations, days):
     # Create the table rows
     rows = []
     
-    # Sort data by stock price
-    data = sorted(data, key=lambda x: x['Stock Price'])
+    # Keep the data sorted in descending order (high to low)
+    # No need to re-sort here as we already sorted at the beginning
     
     for item in data:
         stock_price = item['Stock Price']
