@@ -1442,8 +1442,6 @@ def create_bs_pricing_table(bs_calculations, days):
     ])
     
     return table_container
-    
-    return table
 
 # Callback for Black-Scholes date navigation (previous date)
 @app.callback(
