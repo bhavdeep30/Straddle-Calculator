@@ -869,8 +869,13 @@ def update_selected_options_display(call_data, put_data):
      State('risk-free-rate', 'value'),
      State('current-expiry', 'data')]
 )
-def update_results(n_clicks, call_data, put_data, stock_price_data, risk_free_rate, expiry_date):
-    if n_clicks == 0 or not call_data or not put_data or not stock_price_data:
+def update_results(n_clicks, expiry_date, call_data, put_data, stock_price_data, risk_free_rate):
+    # Get the triggered input
+    ctx = callback_context
+    triggered_id = ctx.triggered[0]['prop_id'].split('.')[0] if ctx.triggered else None
+    
+    # Only proceed if calculate button was clicked or expiry date changed with valid selections
+    if (triggered_id == 'calculate-button' and n_clicks == 0) or not call_data or not put_data or not stock_price_data:
         # Initial state or missing data
         return (
             html.P("Select both a call and put option, then click ANALYZE STRATEGY", style={'color': colors['secondary']}),
@@ -964,6 +969,15 @@ def update_results(n_clicks, call_data, put_data, stock_price_data, risk_free_ra
             
             bs_results[days] = theoretical_prices.to_dict('records')
         
+        # Format expiry date for display
+        formatted_expiry_date = "N/A"
+        if expiry_date:
+            try:
+                expiry_date_obj = datetime.datetime.strptime(expiry_date, "%Y-%m-%d")
+                formatted_expiry_date = expiry_date_obj.strftime("%B %d, %Y")
+            except:
+                formatted_expiry_date = expiry_date
+        
         # Store Black-Scholes calculations for date navigation
         bs_calculations = {
             'current_days': days_to_expiry,
@@ -974,7 +988,8 @@ def update_results(n_clicks, call_data, put_data, stock_price_data, risk_free_ra
             'call_strike': call_strike,
             'put_strike': put_strike,
             'current_price': current_price,
-            'is_true_straddle': is_true_straddle
+            'is_true_straddle': is_true_straddle,
+            'expiry_date': formatted_expiry_date
         }
         
         # Create the Black-Scholes pricing table for the current date
@@ -1364,6 +1379,7 @@ def create_bs_pricing_table(bs_calculations, days):
     put_price = bs_calculations['put_price']
     current_price = bs_calculations['current_price']
     is_true_straddle = bs_calculations['is_true_straddle']
+    expiry_date = bs_calculations.get('expiry_date')
     
     # Sort data by stock price
     data = sorted(data, key=lambda x: x['Stock Price'])
@@ -1420,12 +1436,31 @@ def create_bs_pricing_table(bs_calculations, days):
     # Create the table body
     body = html.Tbody(rows)
     
-    # Create the table with a title showing the current price
+    # Create the table with a title showing the current price and expiry information
     table_container = html.Div([
         html.Div([
             html.Span("Current Price: ", style={'fontWeight': 'bold'}),
             html.Span(f"${current_price:.2f}", style={
                 'backgroundColor': colors['accent'],
+                'color': colors['text'],
+                'padding': '3px 8px',
+                'borderRadius': '3px',
+                'marginLeft': '5px'
+            })
+        ], style={'marginBottom': '5px', 'textAlign': 'center'}),
+        
+        html.Div([
+            html.Span("Expiration Date: ", style={'fontWeight': 'bold'}),
+            html.Span(expiry_date if expiry_date else "N/A", style={
+                'backgroundColor': colors['secondary'],
+                'color': colors['text'],
+                'padding': '3px 8px',
+                'borderRadius': '3px',
+                'marginLeft': '5px'
+            }),
+            html.Span(" | Days to Expiry: ", style={'fontWeight': 'bold', 'marginLeft': '10px'}),
+            html.Span(f"{days}", style={
+                'backgroundColor': colors['secondary'],
                 'color': colors['text'],
                 'padding': '3px 8px',
                 'borderRadius': '3px',
@@ -1740,13 +1775,38 @@ def go_to_next_expiration(n_clicks, next_exp, ticker, all_expiries_json):
                 None
             )
         
+        # Find the closest strikes to current price
+        closest_call_idx = (calls_df['Strike'] - current_price).abs().idxmin()
+        closest_put_idx = (puts_df['Strike'] - current_price).abs().idxmin()
+        
+        # Sort the dataframes by strike price
+        calls_df = calls_df.sort_values('Strike')
+        puts_df = puts_df.sort_values('Strike')
+        
+        # Get 5 strikes above and below the closest strike
+        call_start_idx = max(0, closest_call_idx - 5)
+        call_end_idx = min(len(calls_df) - 1, closest_call_idx + 5)
+        put_start_idx = max(0, closest_put_idx - 5)
+        put_end_idx = min(len(puts_df) - 1, closest_put_idx + 5)
+        
+        # Filter the dataframes to show options around current price
+        visible_calls_df = calls_df.iloc[call_start_idx:call_end_idx + 1].copy()
+        visible_puts_df = puts_df.iloc[put_start_idx:put_end_idx + 1].copy()
+        
+        # Add a column to highlight the row closest to current price
+        visible_calls_df['Near Current'] = False
+        visible_calls_df.iloc[(visible_calls_df['Strike'] - current_price).abs().idxmin()] = True
+        
+        visible_puts_df['Near Current'] = False
+        visible_puts_df.iloc[(visible_puts_df['Strike'] - current_price).abs().idxmin()] = True
+        
         # Create interactive tables
         calls_table = dash_table.DataTable(
             id='calls-table',
             columns=[
-                {"name": col, "id": col} for col in calls_df.columns
+                {"name": col, "id": col} for col in visible_calls_df.columns if col != 'Near Current'
             ],
-            data=calls_df.to_dict('records'),
+            data=visible_calls_df.to_dict('records'),
             style_header={
                 'backgroundColor': colors['secondary'],
                 'color': colors['text'],
@@ -1771,19 +1831,25 @@ def go_to_next_expiration(n_clicks, next_exp, ticker, all_expiries_json):
                     'backgroundColor': colors['accent'],
                     'color': colors['text'],
                     'border': f'1px solid {colors["text"]}'
+                },
+                {
+                    'if': {'filter_query': '{Near Current} eq true'},
+                    'backgroundColor': colors['secondary'],
+                    'fontWeight': 'bold'
                 }
             ],
             row_selectable='single',
             selected_rows=[],
-            page_size=10
+            page_action='none',  # No pagination to show all visible options
+            style_table={'height': '400px', 'overflowY': 'auto'}
         )
         
         puts_table = dash_table.DataTable(
             id='puts-table',
             columns=[
-                {"name": col, "id": col} for col in puts_df.columns
+                {"name": col, "id": col} for col in visible_puts_df.columns if col != 'Near Current'
             ],
-            data=puts_df.to_dict('records'),
+            data=visible_puts_df.to_dict('records'),
             style_header={
                 'backgroundColor': colors['secondary'],
                 'color': colors['text'],
@@ -1808,11 +1874,17 @@ def go_to_next_expiration(n_clicks, next_exp, ticker, all_expiries_json):
                     'backgroundColor': colors['accent'],
                     'color': colors['text'],
                     'border': f'1px solid {colors["text"]}'
+                },
+                {
+                    'if': {'filter_query': '{Near Current} eq true'},
+                    'backgroundColor': colors['secondary'],
+                    'fontWeight': 'bold'
                 }
             ],
             row_selectable='single',
             selected_rows=[],
-            page_size=10
+            page_action='none',  # No pagination to show all visible options
+            style_table={'height': '400px', 'overflowY': 'auto'}
         )
         
         return calls_table, puts_table, exp_date_formatted, new_prev, next_exp, new_next, None, None
