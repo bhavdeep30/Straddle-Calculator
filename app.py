@@ -1410,43 +1410,13 @@ def create_bs_pricing_table(bs_calculations, days):
     # Create the table rows
     rows = []
     
-    # Add breakeven rows if they're not already in the data
-    breakeven_prices = [lower_breakeven, upper_breakeven]
-    stock_prices = [item['Stock Price'] for item in data]
-    
-    # Add breakeven rows if they're not already in the data
-    for be_price in breakeven_prices:
-        # Check if this breakeven price is already in our data
-        if not any(abs(price - be_price) < 0.01 for price in stock_prices):
-            # Calculate theoretical values at breakeven
-            t_expiry = max(0.0001, days / 365)
-            r = bs_calculations.get('risk_free_rate', 4.5) / 100
-            iv_call = bs_calculations.get('call_iv', 30) / 100
-            iv_put = bs_calculations.get('put_iv', 30) / 100
-            
-            if is_true_straddle:
-                be_call_value = black_scholes(be_price, call_strike, t_expiry, r, iv_call, "call")
-                be_put_value = black_scholes(be_price, call_strike, t_expiry, r, iv_put, "put")
-            else:
-                be_call_value = black_scholes(be_price, call_strike, t_expiry, r, iv_call, "call")
-                be_put_value = black_scholes(be_price, put_strike, t_expiry, r, iv_put, "put")
-            
-            # Add to data
-            data.append({
-                'Stock Price': be_price,
-                'Call Price': be_call_value,
-                'Put Price': be_put_value,
-                'is_breakeven': True
-            })
-    
-    # Sort data by stock price after adding breakeven points
+    # Sort data by stock price
     data = sorted(data, key=lambda x: x['Stock Price'])
     
     for item in data:
         stock_price = item['Stock Price']
         call_value = item['Call Price']
         put_value = item['Put Price']
-        is_breakeven = item.get('is_breakeven', False)
         
         # Calculate P/L
         call_pl = call_value - call_price
@@ -1455,7 +1425,7 @@ def create_bs_pricing_table(bs_calculations, days):
         contract_pl = total_pl * 100
         
         # Determine row style based on price type
-        if is_breakeven:
+        if abs(contract_pl) < 0.01:  # Contract P/L is close to zero (breakeven point)
             # Breakeven point - highlight in a distinct way
             row_style = {'backgroundColor': colors['secondary'], 'color': colors['text'], 'fontWeight': 'bold', 'borderTop': f'2px solid {colors["accent"]}', 'borderBottom': f'2px solid {colors["accent"]}'}
         elif abs(stock_price - current_price) < 0.01:
