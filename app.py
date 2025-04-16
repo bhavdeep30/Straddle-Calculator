@@ -99,22 +99,45 @@ def calculate_breakeven_points(strike_price, total_premium):
     return lower_breakeven, upper_breakeven
 
 # Function to get options chain for a ticker
-def get_options_chain(ticker):
-    """Get options chain for a ticker"""
+def get_options_chain(ticker, selected_expiration=None):
+    """
+    Get options chain for a ticker
+    
+    Parameters:
+    ticker: Stock ticker symbol
+    selected_expiration: Optional specific expiration date to fetch
+    
+    Returns:
+    calls_df, puts_df, exp_date, all_expirations
+    """
     try:
+        # Normalize ticker symbol (uppercase and strip whitespace)
+        ticker = ticker.strip().upper()
+        
+        # Create ticker object
         stock = yf.Ticker(ticker)
+        
+        # Verify we can get data for this ticker
+        info = stock.info
+        if not info or 'regularMarketPrice' not in info:
+            raise ValueError(f"Could not retrieve data for ticker {ticker}")
+        
+        # Get available expiration dates
         expirations = stock.options
         
-        if not expirations:
-            return None, None, None
+        if not expirations or len(expirations) == 0:
+            raise ValueError(f"No options data available for {ticker}")
         
-        # Get the first expiration date
-        exp_date = expirations[0]
+        # Use selected expiration or default to first available
+        exp_date = selected_expiration if selected_expiration in expirations else expirations[0]
         
         # Get options for this expiration
         options = stock.option_chain(exp_date)
         calls = options.calls
         puts = options.puts
+        
+        if calls.empty or puts.empty:
+            raise ValueError(f"No options chain data available for {ticker} on {exp_date}")
         
         # Format the data
         calls = calls[['strike', 'lastPrice', 'bid', 'ask', 'impliedVolatility', 'inTheMoney']]
@@ -125,10 +148,16 @@ def get_options_chain(ticker):
         puts.columns = ['Strike', 'Last Price', 'Bid', 'Ask', 'IV', 'ITM']
         puts['IV'] = (puts['IV'] * 100).round(2)
         
-        return calls, puts, exp_date
+        # Format expiration dates for dropdown
+        formatted_expirations = [
+            {'label': datetime.datetime.strptime(date, "%Y-%m-%d").strftime("%b %d, %Y"), 'value': date}
+            for date in expirations
+        ]
+        
+        return calls, puts, exp_date, formatted_expirations
     except Exception as e:
-        print(f"Error fetching options: {e}")
-        return None, None, None
+        print(f"Error fetching options for {ticker}: {e}")
+        return None, None, None, None
 
 # App layout
 app.layout = html.Div(style={'backgroundColor': colors['background'], 'color': colors['text'], 'minHeight': '100vh', 'fontFamily': 'Arial, sans-serif'}, children=[
@@ -142,6 +171,15 @@ app.layout = html.Div(style={'backgroundColor': colors['background'], 'color': c
     dcc.Store(id='selected-call', storage_type='memory'),
     dcc.Store(id='selected-put', storage_type='memory'),
     dcc.Store(id='stock-price-store', storage_type='memory'),
+    
+    # Loading component
+    dcc.Loading(
+        id="loading-data",
+        type="circle",
+        color=colors['accent'],
+        children=[html.Div(id="loading-output")],
+        style={'position': 'fixed', 'top': '50%', 'left': '50%', 'transform': 'translate(-50%, -50%)', 'zIndex': '1000'}
+    ),
     
     # Main content
     html.Div(style={'display': 'flex', 'flexWrap': 'wrap', 'padding': '20px'}, children=[
@@ -217,7 +255,21 @@ app.layout = html.Div(style={'backgroundColor': colors['background'], 'color': c
         # Middle panel - Options tables
         html.Div(style={'flex': '2', 'minWidth': '500px', 'backgroundColor': colors['panel'], 'padding': '20px', 'borderRadius': '10px', 'margin': '10px'}, children=[
             html.H3("OPTIONS CHAIN", style={'color': colors['accent'], 'borderBottom': f'1px solid {colors["secondary"]}', 'paddingBottom': '10px'}),
-            html.Div(id='expiration-date-display', style={'marginBottom': '15px', 'color': colors['text'], 'fontWeight': 'bold'}),
+            
+            # Expiration date selector
+            html.Div(style={'marginBottom': '15px'}, children=[
+                html.Label("EXPIRATION DATE", style={'fontWeight': 'bold', 'marginBottom': '5px', 'display': 'block', 'color': colors['text']}),
+                dcc.Dropdown(
+                    id='expiration-dropdown',
+                    options=[],
+                    style={
+                        'backgroundColor': colors['background'],
+                        'color': colors['text'],
+                        'border': f'1px solid {colors["secondary"]}',
+                        'borderRadius': '5px'
+                    }
+                ),
+            ]),
             
             # Options tables
             html.Div(style={'display': 'flex', 'flexWrap': 'wrap', 'gap': '20px'}, children=[
@@ -258,13 +310,19 @@ app.layout = html.Div(style={'backgroundColor': colors['background'], 'color': c
     ])
 ])
 
+# Store for current ticker
+dcc.Store(id='current-ticker', storage_type='memory'),
+
 # Callback to fetch options and display tables
 @app.callback(
     [Output('calls-table-container', 'children'),
      Output('puts-table-container', 'children'),
      Output('stock-info', 'children'),
-     Output('expiration-date-display', 'children'),
-     Output('stock-price-store', 'data')],
+     Output('expiration-dropdown', 'options'),
+     Output('expiration-dropdown', 'value'),
+     Output('stock-price-store', 'data'),
+     Output('loading-output', 'children'),
+     Output('current-ticker', 'data')],
     [Input('fetch-options-button', 'n_clicks')],
     [State('ticker-input', 'value')]
 )
@@ -272,14 +330,36 @@ def update_options_tables(n_clicks, ticker):
     if n_clicks is None:
         return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
     
+    if not ticker or ticker.strip() == "":
+        return (
+            html.Div("Please enter a valid ticker symbol", style={'color': colors['loss']}),
+            html.Div("Please enter a valid ticker symbol", style={'color': colors['loss']}),
+            html.Div("No stock data available", style={'color': colors['loss']}),
+            html.Div("No expiration dates available"),
+            None
+        )
+    
     try:
+        # Normalize ticker
+        ticker = ticker.strip().upper()
+        
         # Get stock info
         stock = yf.Ticker(ticker)
-        current_data = stock.history(period="1d")
-        if current_data.empty:
-            raise ValueError(f"No data found for ticker {ticker}")
         
-        current_price = current_data['Close'].iloc[-1]
+        # Try to get info first to validate ticker
+        info = stock.info
+        if not info or 'regularMarketPrice' not in info:
+            raise ValueError(f"No data found for ticker {ticker}")
+            
+        # Get current price
+        current_price = info.get('regularMarketPrice', None)
+        
+        # If we couldn't get price from info, try history
+        if current_price is None:
+            current_data = stock.history(period="1d")
+            if current_data.empty:
+                raise ValueError(f"No price data found for ticker {ticker}")
+            current_price = current_data['Close'].iloc[-1]
         
         # Get options chain
         calls_df, puts_df, exp_date = get_options_chain(ticker)
@@ -387,11 +467,7 @@ def update_options_tables(n_clicks, ticker):
             ])
         ])
         
-        # Format expiration date
-        exp_date_formatted = datetime.datetime.strptime(exp_date, "%Y-%m-%d").strftime("%B %d, %Y")
-        exp_display = html.Div(f"EXPIRATION DATE: {exp_date_formatted}")
-        
-        return calls_table, puts_table, stock_info, exp_display, json.dumps({'price': current_price})
+        return calls_table, puts_table, stock_info, all_expirations, exp_date, json.dumps({'price': current_price}), None, ticker
         
     except Exception as e:
         error_message = f"Error: {str(e)}"
@@ -399,7 +475,10 @@ def update_options_tables(n_clicks, ticker):
             html.Div(error_message, style={'color': colors['loss']}),
             html.Div(error_message, style={'color': colors['loss']}),
             html.Div(error_message, style={'color': colors['loss']}),
-            html.Div("No expiration dates available"),
+            [],
+            None,
+            None,
+            None,
             None
         )
 
@@ -691,6 +770,118 @@ def update_results(n_clicks, call_data, put_data, stock_price_data, risk_free_ra
         return (
             html.P(error_message, style={'color': colors['loss']}),
             go.Figure()
+        )
+
+# Callback to update options tables when expiration date changes
+@app.callback(
+    [Output('calls-table-container', 'children', allow_duplicate=True),
+     Output('puts-table-container', 'children', allow_duplicate=True),
+     Output('selected-call', 'data', allow_duplicate=True),
+     Output('selected-put', 'data', allow_duplicate=True)],
+    [Input('expiration-dropdown', 'value')],
+    [State('current-ticker', 'data')],
+    prevent_initial_call=True
+)
+def update_expiration_date(selected_expiration, ticker):
+    if not selected_expiration or not ticker:
+        return dash.no_update, dash.no_update, dash.no_update, dash.no_update
+    
+    try:
+        # Get options chain for the selected expiration
+        calls_df, puts_df, _, _ = get_options_chain(ticker, selected_expiration)
+        
+        if calls_df is None or puts_df is None:
+            return (
+                html.Div("No options data available for this date", style={'color': colors['loss']}),
+                html.Div("No options data available for this date", style={'color': colors['loss']}),
+                None,
+                None
+            )
+        
+        # Create interactive tables
+        calls_table = dash_table.DataTable(
+            id='calls-table',
+            columns=[
+                {"name": col, "id": col} for col in calls_df.columns
+            ],
+            data=calls_df.to_dict('records'),
+            style_header={
+                'backgroundColor': colors['secondary'],
+                'color': colors['text'],
+                'fontWeight': 'bold',
+                'textAlign': 'center'
+            },
+            style_cell={
+                'backgroundColor': colors['background'],
+                'color': colors['text'],
+                'textAlign': 'center',
+                'padding': '10px',
+                'minWidth': '70px'
+            },
+            style_data_conditional=[
+                {
+                    'if': {'column_id': 'ITM', 'filter_query': '{ITM} eq True'},
+                    'backgroundColor': 'rgba(0, 255, 127, 0.2)',
+                    'color': colors['profit']
+                },
+                {
+                    'if': {'state': 'selected'},
+                    'backgroundColor': colors['accent'],
+                    'color': colors['text'],
+                    'border': f'1px solid {colors["text"]}'
+                }
+            ],
+            row_selectable='single',
+            selected_rows=[],
+            page_size=10
+        )
+        
+        puts_table = dash_table.DataTable(
+            id='puts-table',
+            columns=[
+                {"name": col, "id": col} for col in puts_df.columns
+            ],
+            data=puts_df.to_dict('records'),
+            style_header={
+                'backgroundColor': colors['secondary'],
+                'color': colors['text'],
+                'fontWeight': 'bold',
+                'textAlign': 'center'
+            },
+            style_cell={
+                'backgroundColor': colors['background'],
+                'color': colors['text'],
+                'textAlign': 'center',
+                'padding': '10px',
+                'minWidth': '70px'
+            },
+            style_data_conditional=[
+                {
+                    'if': {'column_id': 'ITM', 'filter_query': '{ITM} eq True'},
+                    'backgroundColor': 'rgba(255, 71, 87, 0.2)',
+                    'color': colors['loss']
+                },
+                {
+                    'if': {'state': 'selected'},
+                    'backgroundColor': colors['accent'],
+                    'color': colors['text'],
+                    'border': f'1px solid {colors["text"]}'
+                }
+            ],
+            row_selectable='single',
+            selected_rows=[],
+            page_size=10
+        )
+        
+        return calls_table, puts_table, None, None
+        
+    except Exception as e:
+        error_message = f"Error: {str(e)}"
+        return (
+            html.Div(error_message, style={'color': colors['loss']}),
+            html.Div(error_message, style={'color': colors['loss']}),
+            None,
+            None
         )
 
 # Run the app
