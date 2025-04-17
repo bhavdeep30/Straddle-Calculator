@@ -1455,8 +1455,35 @@ def create_bs_pricing_table(bs_calculations, days):
     # Create the table rows
     rows = []
     
-    # Keep the data sorted in descending order (high to low)
-    # No need to re-sort here as we already sorted at the beginning
+    # First add the breakeven points explicitly if they're not in the data
+    be_points = [lower_breakeven, upper_breakeven]
+    for be_price in be_points:
+        if not any(abs(item['Stock Price'] - be_price) < 0.01 for item in data):
+            # Calculate values at breakeven
+            call_value = black_scholes(
+                be_price,
+                bs_calculations['call_strike'],
+                days/365,
+                risk_free_rate/100,
+                call_iv/100,
+                "call"
+            )
+            put_value = black_scholes(
+                be_price,
+                bs_calculations['put_strike'],
+                days/365,
+                risk_free_rate/100,
+                put_iv/100,
+                "put"
+            )
+            data.append({
+                'Stock Price': be_price,
+                'Call Price': call_value,
+                'Put Price': put_value
+            })
+    
+    # Re-sort the data by stock price in descending order
+    data = sorted(data, key=lambda x: x['Stock Price'], reverse=True)
     
     for item in data:
         stock_price = item['Stock Price']
@@ -1473,8 +1500,9 @@ def create_bs_pricing_table(bs_calculations, days):
         # Determine row style based on price type
         is_breakeven = abs(contract_pl) < 1.0  # Contract P/L is close to zero (breakeven point)
         is_current = abs(stock_price - current_price) < 0.01
+        is_exact_be = any(abs(stock_price - be_price) < 0.01 for be_price in [lower_breakeven, upper_breakeven])
         
-        if is_breakeven:
+        if is_exact_be or is_breakeven:
             # Breakeven point - highlight in a distinct way
             row_style = {
                 'backgroundColor': colors['secondary'], 
@@ -1484,7 +1512,11 @@ def create_bs_pricing_table(bs_calculations, days):
                 'borderBottom': f'2px solid {colors["accent"]}'
             }
             # Add breakeven label to stock price
-            stock_price_display = f"${stock_price:.2f} (Breakeven)"
+            if is_exact_be:
+                be_type = "Lower BE" if abs(stock_price - lower_breakeven) < 0.01 else "Upper BE"
+                stock_price_display = f"${stock_price:.2f} ({be_type})"
+            else:
+                stock_price_display = f"${stock_price:.2f} (Breakeven)"
         elif is_current:
             # Current price
             row_style = {'backgroundColor': colors['accent'], 'color': colors['text'], 'fontWeight': 'bold'}
