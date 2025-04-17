@@ -1348,10 +1348,15 @@ def update_results(n_clicks, expiry_date, call_data, put_data, stock_price_data,
                 html.Div(style={'minWidth': '150px', 'margin': '10px'}, children=[
                     html.H5(f"{strategy_type} COST", style={'color': colors['accent'], 'marginTop': '0'}),
                     html.P(f"Total Premium: ${total_premium:.2f}", style={'margin': '5px 0'}),
-                    html.P([
-                        html.Span("Straddle Cost: ", style={'fontWeight': 'bold'}),
-                        html.Span(f"${total_premium * 100:.2f}", style={'color': colors['loss'], 'fontWeight': 'bold'})
-                    ], style={'margin': '5px 0'}),
+                    html.Div([
+                        html.Span("Straddle Cost: ", style={'fontWeight': 'bold', 'verticalAlign': 'middle'}),
+                        html.Span(f"${total_premium * 100:.2f}", style={
+                            'color': colors['loss'], 
+                            'fontWeight': 'bold',
+                            'verticalAlign': 'middle',
+                            'display': 'inline-block'
+                        })
+                    ], style={'margin': '5px 0', 'lineHeight': '1.5'}),
                 ]),
             ]),
             
