@@ -1387,11 +1387,8 @@ def create_bs_pricing_table(bs_calculations, days):
     # Create the table header
     header = html.Thead(html.Tr([
         html.Th("Stock Price", style={'backgroundColor': colors['secondary'], 'color': colors['text'], 'padding': '10px', 'textAlign': 'center'}),
-        html.Th("Call Value", style={'backgroundColor': colors['secondary'], 'color': colors['text'], 'padding': '10px', 'textAlign': 'center'}),
-        html.Th("Put Value", style={'backgroundColor': colors['secondary'], 'color': colors['text'], 'padding': '10px', 'textAlign': 'center'}),
         html.Th("Call Contract Value", style={'backgroundColor': colors['secondary'], 'color': colors['text'], 'padding': '10px', 'textAlign': 'center'}),
         html.Th("Put Contract Value", style={'backgroundColor': colors['secondary'], 'color': colors['text'], 'padding': '10px', 'textAlign': 'center'}),
-        html.Th("Total Contract Value", style={'backgroundColor': colors['secondary'], 'color': colors['text'], 'padding': '10px', 'textAlign': 'center'}),
         html.Th(f"Total Premium (${(call_price + put_price) * 100:.2f})", style={'backgroundColor': colors['secondary'], 'color': colors['text'], 'padding': '10px', 'textAlign': 'center'}),
         html.Th("Contract P/L", style={'backgroundColor': colors['secondary'], 'color': colors['text'], 'padding': '10px', 'textAlign': 'center'})
     ]))
@@ -1448,11 +1445,8 @@ def create_bs_pricing_table(bs_calculations, days):
         
         row = html.Tr([
             html.Td(f"${stock_price:.2f}", style={'padding': '8px', 'textAlign': 'center', **row_style}),
-            html.Td(f"${call_value:.2f}", style={'padding': '8px', 'textAlign': 'center', **{**row_style, **call_value_style}}),
-            html.Td(f"${put_value:.2f}", style={'padding': '8px', 'textAlign': 'center', **{**row_style, **put_value_style}}),
             html.Td(f"${call_contract_value:.2f}", style={'padding': '8px', 'textAlign': 'center', **{**row_style, **call_contract_style}}),
             html.Td(f"${put_contract_value:.2f}", style={'padding': '8px', 'textAlign': 'center', **{**row_style, **put_contract_style}}),
-            html.Td(f"${total_contract_value:.2f}", style={'padding': '8px', 'textAlign': 'center', **{**row_style, **total_contract_style}}),
             html.Td(f"${total_premium:.2f}", style={'padding': '8px', 'textAlign': 'center', **row_style}),
             html.Td(f"${contract_pl:.2f}", style={'padding': '8px', 'textAlign': 'center', **{**row_style, **contract_pl_style}})
         ])
