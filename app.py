@@ -1559,20 +1559,9 @@ def create_bs_pricing_table(bs_calculations, days):
     # Create the table body
     body = html.Tbody(rows)
     
-    # Create the table with a title showing the current price and expiry information
+    # Create the table with expiry information
     table_container = html.Div([
         html.Div([
-            html.Div([
-                html.Span("Current Price: ", style={'fontWeight': 'bold'}),
-                html.Span(f"${current_price:.2f}", style={
-                    'backgroundColor': colors['secondary'],
-                    'color': colors['text'],
-                    'padding': '3px 8px',
-                    'borderRadius': '3px',
-                    'marginLeft': '5px'
-                }),
-            ], style={'marginBottom': '10px', 'textAlign': 'center'}),
-            
             html.Div([
                 html.Span("Total Premium Paid: ", style={'fontWeight': 'bold'}),
                 html.Span(f"${(call_price + put_price) * 100:.2f}", style={
@@ -1593,10 +1582,7 @@ def create_bs_pricing_table(bs_calculations, days):
                     'borderRadius': '3px',
                     'marginLeft': '5px'
                 }),
-            ], style={'marginBottom': '10px', 'textAlign': 'center'}),
-            
-            html.Div([
-                html.Span("Days to Expiry: ", style={'fontWeight': 'bold'}),
+                html.Span(" | Days to Expiry: ", style={'fontWeight': 'bold', 'marginLeft': '10px'}),
                 html.Span(f"{days}", style={
                     'backgroundColor': colors['secondary'],
                     'color': colors['text'],
