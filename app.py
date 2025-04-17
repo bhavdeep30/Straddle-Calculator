@@ -1612,7 +1612,8 @@ def create_bs_pricing_table(bs_calculations, days):
                     'borderRadius': '3px',
                     'marginLeft': '10px'
                 })
-            ], style={'marginBottom': '15px', 'textAlign': 'center'}),
+            ], style={'marginBottom': '15px', 'textAlign': 'center'})
+        ]),
         
         html.Table([header, body], style={
             'width': '100%',
