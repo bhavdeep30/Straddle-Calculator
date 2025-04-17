@@ -1334,18 +1334,18 @@ def update_results(n_clicks, expiry_date, call_data, put_data, stock_price_data,
             
             html.Div(style={'display': 'flex', 'justifyContent': 'space-between', 'flexWrap': 'wrap'}, children=[
                 html.Div(style={'minWidth': '150px', 'margin': '10px'}, children=[
-                    html.H5("PUT OPTION", style={'color': colors['loss'], 'marginTop': '0'}),
+                    html.H5("PUT OPTION", style={'color': colors['accent'], 'marginTop': '0'}),
                     html.P(f"Price: ${put_price:.2f}", style={'margin': '5px 0'}),
                     html.P(f"Strike: ${put_strike:.2f}", style={'margin': '5px 0'}),
                     html.P(f"IV: {put_data['IV']}%", style={'margin': '5px 0'}),
                 ]),
                 html.Div(style={'minWidth': '150px', 'margin': '10px'}, children=[
-                    html.H5(f"{strategy_type} COST", style={'color': colors['accent'], 'marginTop': '0'}),
+                    html.H5(f"{strategy_type} COST", style={'color': colors['text'], 'marginTop': '0'}),
                     html.P(f"Total Premium: ${total_premium:.2f}", style={'margin': '5px 0'}),
                     html.Div([
-                        html.Span("Straddle Cost: ", style={'fontWeight': 'bold', 'verticalAlign': 'middle'}),
+                        html.Span("Total Cost: ", style={'fontWeight': 'bold', 'verticalAlign': 'middle'}),
                         html.Span(f"${total_premium * 100:.2f}", style={
-                            'color': colors['loss'], 
+                            'color': colors['accent'], 
                             'fontWeight': 'bold',
                             'verticalAlign': 'middle',
                             'display': 'inline-block',
@@ -1565,7 +1565,7 @@ def create_bs_pricing_table(bs_calculations, days):
             html.Div([
                 html.Span("Total Premium Paid: ", style={'fontWeight': 'bold'}),
                 html.Span(f"${(call_price + put_price) * 100:.2f}", style={
-                    'backgroundColor': colors['secondary'],
+                    'backgroundColor': colors['accent'],
                     'color': colors['text'],
                     'padding': '3px 8px',
                     'borderRadius': '3px',
@@ -1582,7 +1582,7 @@ def create_bs_pricing_table(bs_calculations, days):
                     'borderRadius': '3px',
                     'marginLeft': '5px'
                 }),
-                html.Span(" | Days to Expiry: ", style={'fontWeight': 'bold', 'marginLeft': '10px'}),
+                html.Span("Days to Expiry: ", style={'fontWeight': 'bold', 'marginLeft': '10px'}),
                 html.Span(f"{days}", style={
                     'backgroundColor': colors['secondary'],
                     'color': colors['text'],
