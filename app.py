@@ -1334,12 +1334,6 @@ def update_results(n_clicks, expiry_date, call_data, put_data, stock_price_data,
             
             html.Div(style={'display': 'flex', 'justifyContent': 'space-between', 'flexWrap': 'wrap'}, children=[
                 html.Div(style={'minWidth': '150px', 'margin': '10px'}, children=[
-                    html.H5("CALL OPTION", style={'color': colors['profit'], 'marginTop': '0'}),
-                    html.P(f"Price: ${call_price:.2f}", style={'margin': '5px 0'}),
-                    html.P(f"Strike: ${call_strike:.2f}", style={'margin': '5px 0'}),
-                    html.P(f"IV: {call_data['IV']}%", style={'margin': '5px 0'}),
-                ]),
-                html.Div(style={'minWidth': '150px', 'margin': '10px'}, children=[
                     html.H5("PUT OPTION", style={'color': colors['loss'], 'marginTop': '0'}),
                     html.P(f"Price: ${put_price:.2f}", style={'margin': '5px 0'}),
                     html.P(f"Strike: ${put_strike:.2f}", style={'margin': '5px 0'}),
@@ -1359,6 +1353,12 @@ def update_results(n_clicks, expiry_date, call_data, put_data, stock_price_data,
                             'top': '1px'
                         })
                     ], style={'margin': '5px 0', 'lineHeight': '1.5'}),
+                ]),
+                html.Div(style={'minWidth': '150px', 'margin': '10px'}, children=[
+                    html.H5("CALL OPTION", style={'color': colors['profit'], 'marginTop': '0'}),
+                    html.P(f"Price: ${call_price:.2f}", style={'margin': '5px 0'}),
+                    html.P(f"Strike: ${call_strike:.2f}", style={'margin': '5px 0'}),
+                    html.P(f"IV: {call_data['IV']}%", style={'margin': '5px 0'}),
                 ]),
             ]),
             
