@@ -1376,7 +1376,7 @@ def update_results(n_clicks, expiry_date, call_data, put_data, stock_price_data,
             html.Div(style={'backgroundColor': colors['panel'], 'padding': '15px', 'borderRadius': '5px', 'marginTop': '15px'}, children=[
                 html.H5("MAX PROFIT/LOSS POTENTIAL", style={'color': colors['accent'], 'marginTop': '0'}),
                 html.P("Maximum Loss: Limited to total premium paid", style={'margin': '5px 0'}),
-                html.P(f"${total_premium:.2f} per share (${total_premium * 100:.2f} per contract)", 
+                html.P(f"${total_premium:.2f} per share (${total_premium * 100:.2f} for straddle)", 
                        style={'margin': '5px 0', 'color': colors['loss'], 'fontWeight': 'bold'}),
                 html.P("Maximum Profit: Unlimited as stock price moves away from strike", style={'margin': '5px 0'}),
                 html.P("Profit increases as price moves further from strike in either direction", 
