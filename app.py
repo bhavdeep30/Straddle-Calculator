@@ -1439,12 +1439,12 @@ def create_bs_pricing_table(bs_calculations, days):
             row_style = {}
         
         # Determine cell styles
-        call_value_style = {'color': colors['profit'] if call_value > call_price else colors['loss'] if call_value < call_price else colors['text']}
-        put_value_style = {'color': colors['profit'] if put_value > put_price else colors['loss'] if put_value < put_price else colors['text']}
-        call_contract_style = {'color': colors['profit'] if call_contract_value > 0 else colors['loss'] if call_contract_value < 0 else colors['text']}
-        put_contract_style = {'color': colors['profit'] if put_contract_value > 0 else colors['loss'] if put_contract_value < 0 else colors['text']}
-        total_contract_style = {'color': colors['profit'] if total_contract_value > total_premium else colors['loss'] if total_contract_value < total_premium else colors['text']}
-        contract_pl_style = {'color': colors['profit'] if contract_pl > 0 else colors['loss'] if contract_pl < 0 else colors['text'], 'fontWeight': 'bold'}
+        call_value_style = {'color': colors['profit'] if call_value > call_price else colors['loss'], 'fontWeight': 'bold' if call_value <= 0 else 'normal'}
+        put_value_style = {'color': colors['profit'] if put_value > put_price else colors['loss'], 'fontWeight': 'bold' if put_value <= 0 else 'normal'}
+        call_contract_style = {'color': colors['profit'] if call_contract_value > 0 else colors['loss'], 'fontWeight': 'bold' if call_contract_value <= 0 else 'normal'}
+        put_contract_style = {'color': colors['profit'] if put_contract_value > 0 else colors['loss'], 'fontWeight': 'bold' if put_contract_value <= 0 else 'normal'}
+        total_contract_style = {'color': colors['profit'] if total_contract_value > total_premium else colors['loss'], 'fontWeight': 'bold'}
+        contract_pl_style = {'color': colors['profit'] if contract_pl > 0 else colors['loss'], 'fontWeight': 'bold'}
         
         row = html.Tr([
             html.Td(f"${stock_price:.2f}", style={'padding': '8px', 'textAlign': 'center', **row_style}),
