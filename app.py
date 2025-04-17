@@ -1435,11 +1435,11 @@ def create_bs_pricing_table(bs_calculations, days):
         else:
             row_style = {}
         
-        # Determine cell styles - always use red for 0 or negative values
-        call_value_style = {'color': colors['loss'] if call_value <= 0 else colors['profit'], 'fontWeight': 'bold' if call_value <= 0 else 'normal'}
-        put_value_style = {'color': colors['loss'] if put_value <= 0 else colors['profit'], 'fontWeight': 'bold' if put_value <= 0 else 'normal'}
-        call_contract_style = {'color': colors['loss'] if call_contract_value <= 0 else colors['profit'], 'fontWeight': 'bold' if call_contract_value <= 0 else 'normal'}
-        put_contract_style = {'color': colors['loss'] if put_contract_value <= 0 else colors['profit'], 'fontWeight': 'bold' if put_contract_value <= 0 else 'normal'}
+        # Determine cell styles - use red for 0 or negative values, white for positive values
+        call_value_style = {'color': colors['loss'] if call_value <= 0 else colors['text'], 'fontWeight': 'bold' if call_value <= 0 else 'normal'}
+        put_value_style = {'color': colors['loss'] if put_value <= 0 else colors['text'], 'fontWeight': 'bold' if put_value <= 0 else 'normal'}
+        call_contract_style = {'color': colors['loss'] if call_contract_value <= 0 else colors['text'], 'fontWeight': 'bold' if call_contract_value <= 0 else 'normal'}
+        put_contract_style = {'color': colors['loss'] if put_contract_value <= 0 else colors['text'], 'fontWeight': 'bold' if put_contract_value <= 0 else 'normal'}
         total_contract_style = {'color': colors['profit'] if total_contract_value > total_premium else colors['loss'], 'fontWeight': 'bold'}
         contract_pl_style = {'color': colors['profit'] if contract_pl > 0 else colors['loss'], 'fontWeight': 'bold'}
         
@@ -1447,19 +1447,19 @@ def create_bs_pricing_table(bs_calculations, days):
         # Ensure 0 or negative values are always red
         row = html.Tr([
             html.Td(f"${stock_price:.2f}", style={'padding': '8px', 'textAlign': 'center', **row_style}),
-            # Force call contract value to use red for 0 or negative values
+            # Force call contract value to use white for positive values and red for 0 or negative values
             html.Td(f"${call_contract_value:.2f}", style={
                 'padding': '8px', 
                 'textAlign': 'center',
-                'color': colors['loss'] if call_contract_value <= 0 else call_contract_style['color'],
+                'color': colors['loss'] if call_contract_value <= 0 else colors['text'],
                 'fontWeight': 'bold' if call_contract_value <= 0 else call_contract_style['fontWeight'],
                 **{k: v for k, v in row_style.items() if k not in ['color', 'fontWeight']}
             }),
-            # Force put contract value to use red for 0 or negative values
+            # Force put contract value to use white for positive values and red for 0 or negative values
             html.Td(f"${put_contract_value:.2f}", style={
                 'padding': '8px', 
                 'textAlign': 'center',
-                'color': colors['loss'] if put_contract_value <= 0 else put_contract_style['color'],
+                'color': colors['loss'] if put_contract_value <= 0 else colors['text'],
                 'fontWeight': 'bold' if put_contract_value <= 0 else put_contract_style['fontWeight'],
                 **{k: v for k, v in row_style.items() if k not in ['color', 'fontWeight']}
             }),
