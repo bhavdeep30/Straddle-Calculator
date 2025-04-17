@@ -1451,7 +1451,7 @@ def create_bs_pricing_table(bs_calculations, days):
             html.Td(f"${call_contract_value:.2f}", style={
                 'padding': '8px', 
                 'textAlign': 'center',
-                'color': colors['loss'] if call_contract_value <= 0 else colors['text'],
+                'color': colors['loss'] if call_contract_value <= 0 or abs(call_contract_value) < 0.001 else colors['text'],
                 'fontWeight': 'bold',
                 **{k: v for k, v in row_style.items() if k not in ['color', 'fontWeight']}
             }),
@@ -1459,7 +1459,7 @@ def create_bs_pricing_table(bs_calculations, days):
             html.Td(f"${put_contract_value:.2f}", style={
                 'padding': '8px', 
                 'textAlign': 'center',
-                'color': colors['loss'] if put_contract_value <= 0 else colors['text'],
+                'color': colors['loss'] if put_contract_value <= 0 or abs(put_contract_value) < 0.001 else colors['text'],
                 'fontWeight': 'bold',
                 **{k: v for k, v in row_style.items() if k not in ['color', 'fontWeight']}
             }),
@@ -1468,8 +1468,8 @@ def create_bs_pricing_table(bs_calculations, days):
             html.Td(f"${contract_pl:.2f}", style={
                 'padding': '8px', 
                 'textAlign': 'center',
-                'color': contract_pl_style['color'],
-                'fontWeight': contract_pl_style['fontWeight'],
+                'color': colors['loss'] if contract_pl <= 0 or abs(contract_pl) < 0.001 else contract_pl_style['color'],
+                'fontWeight': 'bold',
                 **{k: v for k, v in row_style.items() if k not in ['color', 'fontWeight']}
             })
         ])

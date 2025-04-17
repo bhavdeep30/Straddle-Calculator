@@ -123,3 +123,10 @@ body::before {
 button#calculate-button {
     animation: pulse 2s infinite;
 }
+
+/* Force zero values to always be red */
+td:contains("$0.00"), 
+td:contains("0.00") {
+    color: #ff4757 !important;
+    font-weight: bold !important;
+}
