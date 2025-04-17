@@ -394,8 +394,8 @@ app.layout = html.Div(style={'backgroundColor': colors['background'], 'color': c
     dcc.Store(id='bs-calculations', storage_type='memory'),
     # Header
     html.Div(style={'padding': '20px', 'textAlign': 'center', 'borderBottom': f'1px solid {colors["secondary"]}'}, children=[
-        html.H1("ULTRON STRADDLE STRATEGY ANALYZER", style={'color': colors['accent'], 'fontWeight': 'bold', 'letterSpacing': '2px'}),
-        html.H3("Advanced Options Trading Intelligence System", style={'color': colors['text'], 'fontStyle': 'italic'})
+        html.H1("ULTRON FINANCIAL SYSTEMS", style={'color': colors['accent'], 'fontWeight': 'bold', 'letterSpacing': '2px'}),
+        html.H3("STRANGLE PROFIT CALCULATOR", style={'color': colors['text']})
     ]),
     
     # Store components for selected options
@@ -1368,7 +1368,7 @@ def update_results(n_clicks, expiry_date, call_data, put_data, stock_price_data,
                     html.Div([
                         html.P("Lower Breakeven:", style={'margin': '5px 0'}),
                         html.P(f"${lower_breakeven:.2f}", style={'margin': '5px 0', 'fontWeight': 'bold', 'fontSize': '16px'}),
-                        html.P(f"({((lower_breakeven / current_price) - 1) * 100:.2f}% from current)", style={'margin': '5px 0', 'fontSize': '12px', 'color': colors['loss']}),
+                        html.P(f"({((lower_breakeven / current_price) - 1) * 100:.2f}% from current)", style={'margin': '5px 0', 'fontSize': '12px', 'color': colors['accent']}),
                     ]),
                     html.Div([
                         html.P("Upper Breakeven:", style={'margin': '5px 0'}),
@@ -1386,8 +1386,8 @@ def update_results(n_clicks, expiry_date, call_data, put_data, stock_price_data,
             html.Div(style={'backgroundColor': colors['panel'], 'padding': '15px', 'borderRadius': '5px', 'marginTop': '15px'}, children=[
                 html.H5("MAX PROFIT/LOSS POTENTIAL", style={'color': colors['accent'], 'marginTop': '0'}),
                 html.P("Maximum Loss: Limited to total premium paid", style={'margin': '5px 0'}),
-                html.P(f"${total_premium:.2f} per share (${total_premium * 100:.2f} for straddle)", 
-                       style={'margin': '5px 0', 'color': colors['loss'], 'fontWeight': 'bold'}),
+                html.P(f"(${total_premium * 100:.2f} for straddle)", 
+                       style={'margin': '5px 0', 'color': colors['accent'], 'fontWeight': 'bold'}),
                 html.P("Maximum Profit: Unlimited as stock price moves away from strike", style={'margin': '5px 0'}),
                 html.P("Profit increases as price moves further from strike in either direction", 
                        style={'margin': '5px 0', 'color': colors['profit'], 'fontWeight': 'bold'}),
