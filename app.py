@@ -1471,10 +1471,21 @@ def create_bs_pricing_table(bs_calculations, days):
         contract_pl = total_contract_value - total_premium
         
         # Determine row style based on price type
-        if abs(contract_pl) < 1.0:  # Contract P/L is close to zero (breakeven point) - using 1.0 for contract value
+        is_breakeven = abs(contract_pl) < 1.0  # Contract P/L is close to zero (breakeven point)
+        is_current = abs(stock_price - current_price) < 0.01
+        
+        if is_breakeven:
             # Breakeven point - highlight in a distinct way
-            row_style = {'backgroundColor': colors['secondary'], 'color': colors['text'], 'fontWeight': 'bold', 'borderTop': f'2px solid {colors["accent"]}', 'borderBottom': f'2px solid {colors["accent"]}'}
-        elif abs(stock_price - current_price) < 0.01:
+            row_style = {
+                'backgroundColor': colors['secondary'], 
+                'color': colors['text'], 
+                'fontWeight': 'bold', 
+                'borderTop': f'2px solid {colors["accent"]}', 
+                'borderBottom': f'2px solid {colors["accent"]}'
+            }
+            # Add breakeven label to stock price
+            stock_price_display = f"${stock_price:.2f} (Breakeven)"
+        elif is_current:
             # Current price
             row_style = {'backgroundColor': colors['accent'], 'color': colors['text'], 'fontWeight': 'bold'}
         elif abs(stock_price - current_price) < current_price * 0.02:  # Within 2% of current price
@@ -1493,7 +1504,8 @@ def create_bs_pricing_table(bs_calculations, days):
         # Create row with proper styling that ensures contract values are properly colored
         # Ensure 0 or negative values are always red
         row = html.Tr([
-            html.Td(f"${stock_price:.2f}", style={'padding': '8px', 'textAlign': 'center', **row_style}),
+            html.Td(stock_price_display if is_breakeven else f"${stock_price:.2f}", 
+                   style={'padding': '8px', 'textAlign': 'center', **row_style}),
             # Force call contract value to use red for 0 or negative values, green for positive
             html.Td(f"${call_contract_value:.2f}", style={
                 'padding': '8px', 
