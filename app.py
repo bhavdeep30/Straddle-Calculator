@@ -1441,8 +1441,8 @@ def create_bs_pricing_table(bs_calculations, days):
         # Determine cell styles
         call_value_style = {'color': colors['profit'] if call_value > call_price else colors['loss'] if call_value < call_price else colors['text']}
         put_value_style = {'color': colors['profit'] if put_value > put_price else colors['loss'] if put_value < put_price else colors['text']}
-        call_contract_style = {'color': colors['profit'] if call_contract_value > call_price * 100 else colors['loss'] if call_contract_value < call_price * 100 else colors['text']}
-        put_contract_style = {'color': colors['profit'] if put_contract_value > put_price * 100 else colors['loss'] if put_contract_value < put_price * 100 else colors['text']}
+        call_contract_style = {'color': colors['profit'] if call_contract_value > 0 else colors['loss'] if call_contract_value < 0 else colors['text']}
+        put_contract_style = {'color': colors['profit'] if put_contract_value > 0 else colors['loss'] if put_contract_value < 0 else colors['text']}
         total_contract_style = {'color': colors['profit'] if total_contract_value > total_premium else colors['loss'] if total_contract_value < total_premium else colors['text']}
         contract_pl_style = {'color': colors['profit'] if contract_pl > 0 else colors['loss'] if contract_pl < 0 else colors['text'], 'fontWeight': 'bold'}
         
