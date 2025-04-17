@@ -1358,12 +1358,12 @@ def update_results(n_clicks, expiry_date, call_data, put_data, stock_price_data,
                     html.Div([
                         html.P("Lower Breakeven:", style={'margin': '5px 0'}),
                         html.P(f"${lower_breakeven:.2f}", style={'margin': '5px 0', 'fontWeight': 'bold', 'fontSize': '16px'}),
-                        html.P(f"({((lower_breakeven / current_price) - 1) * 100:.2f}% from current)", style={'margin': '5px 0', 'fontSize': '12px', 'color': colors['secondary']}),
+                        html.P(f"({((lower_breakeven / current_price) - 1) * 100:.2f}% from current)", style={'margin': '5px 0', 'fontSize': '12px', 'color': colors['loss']}),
                     ]),
                     html.Div([
                         html.P("Upper Breakeven:", style={'margin': '5px 0'}),
                         html.P(f"${upper_breakeven:.2f}", style={'margin': '5px 0', 'fontWeight': 'bold', 'fontSize': '16px'}),
-                        html.P(f"({((upper_breakeven / current_price) - 1) * 100:.2f}% from current)", style={'margin': '5px 0', 'fontSize': '12px', 'color': colors['secondary']}),
+                        html.P(f"({((upper_breakeven / current_price) - 1) * 100:.2f}% from current)", style={'margin': '5px 0', 'fontSize': '12px', 'color': colors['profit']}),
                     ]),
                     html.Div([
                         html.P("Breakeven Range:", style={'margin': '5px 0'}),
