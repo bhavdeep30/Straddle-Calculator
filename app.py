@@ -538,7 +538,7 @@ app.layout = html.Div(style={'backgroundColor': colors['background'], 'color': c
                 
                 # Puts table
                 html.Div(style={'flex': '1', 'minWidth': '300px'}, children=[
-                    html.H4("PUTS", style={'color': colors['loss'], 'textAlign': 'center'}),
+                    html.H4("PUTS", style={'color': colors['accent'], 'textAlign': 'center'}),
                     html.Div(id='puts-table-container', style={'overflowX': 'auto'})
                 ]),
             ]),
