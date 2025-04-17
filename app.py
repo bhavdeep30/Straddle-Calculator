@@ -1447,19 +1447,19 @@ def create_bs_pricing_table(bs_calculations, days):
         # Ensure 0 or negative values are always red
         row = html.Tr([
             html.Td(f"${stock_price:.2f}", style={'padding': '8px', 'textAlign': 'center', **row_style}),
-            # Force call contract value to use red for 0 or negative values
+            # Force call contract value to use red for 0 or negative values, green for positive
             html.Td(f"${call_contract_value:.2f}", style={
                 'padding': '8px', 
                 'textAlign': 'center',
-                'color': colors['loss'] if call_contract_value <= 0 or abs(call_contract_value) < 0.001 else colors['text'],
+                'color': colors['loss'] if call_contract_value <= 0 or abs(call_contract_value) < 0.001 else colors['profit'],
                 'fontWeight': 'bold',
                 **{k: v for k, v in row_style.items() if k not in ['color', 'fontWeight']}
             }),
-            # Force put contract value to use red for 0 or negative values
+            # Force put contract value to use red for 0 or negative values, green for positive
             html.Td(f"${put_contract_value:.2f}", style={
                 'padding': '8px', 
                 'textAlign': 'center',
-                'color': colors['loss'] if put_contract_value <= 0 or abs(put_contract_value) < 0.001 else colors['text'],
+                'color': colors['loss'] if put_contract_value <= 0 or abs(put_contract_value) < 0.001 else colors['profit'],
                 'fontWeight': 'bold',
                 **{k: v for k, v in row_style.items() if k not in ['color', 'fontWeight']}
             }),

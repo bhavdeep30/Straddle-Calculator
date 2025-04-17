@@ -124,6 +124,12 @@ button#calculate-button {
     animation: pulse 2s infinite;
 }
 
+/* Force positive values to be green */
+td:contains("$") {
+    color: #00ff7f !important;
+    font-weight: bold !important;
+}
+
 /* Force zero values to always be red */
 td:contains("$0.00"), 
 td:contains("0.00") {
