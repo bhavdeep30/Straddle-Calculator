@@ -555,37 +555,14 @@ app.layout = html.Div(style={'backgroundColor': colors['background'], 'color': c
             html.Div([
                 html.H4("BLACK-SCHOLES PRICING SCENARIOS", style={'color': colors['accent'], 'marginTop': '20px', 'marginBottom': '10px'}),
                 
-                # Date navigation for Black-Scholes
-                html.Div(style={'display': 'flex', 'alignItems': 'center', 'justifyContent': 'space-between', 'marginBottom': '15px'}, children=[
-                    html.Button(
-                        '◀ -7 DAYS',
-                        id='prev-date-button',
-                        style={
-                            'backgroundColor': colors['secondary'],
-                            'color': colors['text'],
-                            'border': 'none',
-                            'padding': '8px 15px',
-                            'borderRadius': '5px',
-                            'cursor': 'pointer',
-                            'fontWeight': 'bold',
-                            'width': '100px'
-                        }
-                    ),
-                    html.Div(id='bs-date-display', style={'color': colors['text'], 'fontWeight': 'bold', 'fontSize': '16px'}),
-                    html.Button(
-                        '+7 DAYS ▶',
-                        id='next-date-button',
-                        style={
-                            'backgroundColor': colors['secondary'],
-                            'color': colors['text'],
-                            'border': 'none',
-                            'padding': '8px 15px',
-                            'borderRadius': '5px',
-                            'cursor': 'pointer',
-                            'fontWeight': 'bold',
-                            'width': '100px'
-                        }
-                    ),
+                # Black-Scholes date display
+                html.Div(style={'marginBottom': '15px', 'textAlign': 'center'}, children=[
+                    html.Div(id='bs-date-display', style={
+                        'color': colors['text'],
+                        'fontWeight': 'bold',
+                        'fontSize': '16px',
+                        'marginBottom': '15px'
+                    }),
                 ]),
                 
                 # Black-Scholes pricing table
@@ -1048,7 +1025,7 @@ def update_results(n_clicks, expiry_date, call_data, put_data, stock_price_data,
         
         # Format the date display
         if days_to_expiry == 0:
-            bs_date_display = "AT EXPIRATION"
+            bs_date_display = html.Span("AT EXPIRATION", style={'fontWeight': 'bold', 'fontSize': '18px'})
         else:
             bs_date_display = f"{days_to_expiry} DAYS TO EXPIRY"
         
@@ -1575,60 +1552,67 @@ def create_bs_pricing_table(bs_calculations, days):
     # Create the table with a title showing the current price and expiry information
     table_container = html.Div([
         html.Div([
-            html.Span("Current Price: ", style={'fontWeight': 'bold'}),
-            html.Span(f"${current_price:.2f}", style={
-                'backgroundColor': colors['accent'],
-                'color': colors['text'],
-                'padding': '3px 8px',
-                'borderRadius': '3px',
-                'marginLeft': '5px'
-            }),
-            html.Span(" | Total Premium Paid: ", style={'fontWeight': 'bold', 'marginLeft': '10px'}),
-            html.Span(f"${call_price + put_price:.2f}/share (${(call_price + put_price) * 100:.2f}/contract)", style={
-                'backgroundColor': colors['loss'],
-                'color': colors['text'],
-                'padding': '3px 8px',
-                'borderRadius': '3px',
-                'marginLeft': '5px'
-            })
-        ], style={'marginBottom': '5px', 'textAlign': 'center'}),
-        
-        html.Div([
-            html.Span("Expiration Date: ", style={'fontWeight': 'bold'}),
-            html.Span(expiry_date if expiry_date else "N/A", style={
-                'backgroundColor': colors['secondary'],
-                'color': colors['text'],
-                'padding': '3px 8px',
-                'borderRadius': '3px',
-                'marginLeft': '5px'
-            }),
-            html.Span(" | Days to Expiry: ", style={'fontWeight': 'bold', 'marginLeft': '10px'}),
-            html.Span(f"{days}", style={
-                'backgroundColor': colors['secondary'],
-                'color': colors['text'],
-                'padding': '3px 8px',
-                'borderRadius': '3px',
-                'marginLeft': '5px'
-            })
-        ], style={'marginBottom': '5px', 'textAlign': 'center'}),
-        
-        html.Div([
-            html.Span("Breakeven Points: ", style={'fontWeight': 'bold'}),
-            html.Span(f"Lower: ${lower_breakeven:.2f}", style={
-                'backgroundColor': colors['secondary'],
-                'color': colors['text'],
-                'padding': '3px 8px',
-                'borderRadius': '3px',
-                'marginLeft': '5px'
-            }),
-            html.Span(f"Upper: ${upper_breakeven:.2f}", style={
-                'backgroundColor': colors['secondary'],
-                'color': colors['text'],
-                'padding': '3px 8px',
-                'borderRadius': '3px',
-                'marginLeft': '10px'
-            })
-        ], style={'marginBottom': '10px', 'textAlign': 'center'}),
+            html.Div([
+                html.Span("Current Price: ", style={'fontWeight': 'bold'}),
+                html.Span(f"${current_price:.2f}", style={
+                    'backgroundColor': colors['accent'],
+                    'color': colors['text'],
+                    'padding': '3px 8px',
+                    'borderRadius': '3px',
+                    'marginLeft': '5px'
+                }),
+            ], style={'marginBottom': '10px', 'textAlign': 'center'}),
+            
+            html.Div([
+                html.Span("Total Premium Paid: ", style={'fontWeight': 'bold'}),
+                html.Span(f"${call_price + put_price:.2f}/share (${(call_price + put_price) * 100:.2f}/contract)", style={
+                    'backgroundColor': colors['loss'],
+                    'color': colors['text'],
+                    'padding': '3px 8px',
+                    'borderRadius': '3px',
+                    'marginLeft': '5px'
+                }),
+            ], style={'marginBottom': '10px', 'textAlign': 'center'}),
+            
+            html.Div([
+                html.Span("Expiration Date: ", style={'fontWeight': 'bold'}),
+                html.Span(expiry_date if expiry_date else "N/A", style={
+                    'backgroundColor': colors['secondary'],
+                    'color': colors['text'],
+                    'padding': '3px 8px',
+                    'borderRadius': '3px',
+                    'marginLeft': '5px'
+                }),
+            ], style={'marginBottom': '10px', 'textAlign': 'center'}),
+            
+            html.Div([
+                html.Span("Days to Expiry: ", style={'fontWeight': 'bold'}),
+                html.Span(f"{days}", style={
+                    'backgroundColor': colors['secondary'],
+                    'color': colors['text'],
+                    'padding': '3px 8px',
+                    'borderRadius': '3px',
+                    'marginLeft': '5px'
+                }),
+            ], style={'marginBottom': '10px', 'textAlign': 'center'}),
+            
+            html.Div([
+                html.Span("Breakeven Points: ", style={'fontWeight': 'bold'}),
+                html.Span(f"Lower: ${lower_breakeven:.2f}", style={
+                    'backgroundColor': colors['secondary'],
+                    'color': colors['text'],
+                    'padding': '3px 8px',
+                    'borderRadius': '3px',
+                    'marginLeft': '5px'
+                }),
+                html.Span(f"Upper: ${upper_breakeven:.2f}", style={
+                    'backgroundColor': colors['secondary'],
+                    'color': colors['text'],
+                    'padding': '3px 8px',
+                    'borderRadius': '3px',
+                    'marginLeft': '10px'
+                })
+            ], style={'marginBottom': '15px', 'textAlign': 'center'}),
         
         html.Table([header, body], style={
             'width': '100%',
