@@ -1037,7 +1037,10 @@ def update_results(n_clicks, expiry_date, call_data, put_data, stock_price_data,
             'put_strike': put_strike,
             'current_price': current_price,
             'is_true_straddle': is_true_straddle,
-            'expiry_date': formatted_expiry_date
+            'expiry_date': formatted_expiry_date,
+            'risk_free_rate': risk_free_rate,
+            'call_iv': call_iv,
+            'put_iv': put_iv
         }
         
         # Create the Black-Scholes pricing table for the current date
@@ -1464,16 +1467,16 @@ def create_bs_pricing_table(bs_calculations, days):
                 be_price,
                 bs_calculations['call_strike'],
                 days/365,
-                risk_free_rate/100,
-                call_iv/100,
+                bs_calculations['risk_free_rate']/100,
+                bs_calculations['call_iv']/100,
                 "call"
             )
             put_value = black_scholes(
                 be_price,
                 bs_calculations['put_strike'],
                 days/365,
-                risk_free_rate/100,
-                put_iv/100,
+                bs_calculations['risk_free_rate']/100,
+                bs_calculations['put_iv']/100,
                 "put"
             )
             data.append({
