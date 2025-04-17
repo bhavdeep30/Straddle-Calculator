@@ -1565,7 +1565,7 @@ def create_bs_pricing_table(bs_calculations, days):
             html.Div([
                 html.Span("Current Price: ", style={'fontWeight': 'bold'}),
                 html.Span(f"${current_price:.2f}", style={
-                    'backgroundColor': colors['accent'],
+                    'backgroundColor': colors['secondary'],
                     'color': colors['text'],
                     'padding': '3px 8px',
                     'borderRadius': '3px',
@@ -1575,8 +1575,8 @@ def create_bs_pricing_table(bs_calculations, days):
             
             html.Div([
                 html.Span("Total Premium Paid: ", style={'fontWeight': 'bold'}),
-                html.Span(f"${(call_price + put_price) * 100:.2f} (Straddle Cost)", style={
-                    'backgroundColor': colors['loss'],
+                html.Span(f"${(call_price + put_price) * 100:.2f}", style={
+                    'backgroundColor': colors['secondary'],
                     'color': colors['text'],
                     'padding': '3px 8px',
                     'borderRadius': '3px',
