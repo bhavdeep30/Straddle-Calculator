@@ -1443,17 +1443,14 @@ def create_bs_pricing_table(bs_calculations, days):
         html.Th("Contract P/L", style={'backgroundColor': colors['secondary'], 'color': colors['text'], 'padding': '10px', 'textAlign': 'center'})
     ]))
     
-    # Get breakeven points
-    if is_true_straddle:
-        call_strike = bs_calculations['call_strike']
-        total_premium = call_price + put_price
-        lower_breakeven = call_strike - total_premium
-        upper_breakeven = call_strike + total_premium
-    else:
-        call_strike = bs_calculations['call_strike']
-        put_strike = bs_calculations['put_strike']
-        lower_breakeven = put_strike - put_price
-        upper_breakeven = call_strike + call_price
+    # Get breakeven points using the same calculation as in strategy details
+    lower_breakeven, upper_breakeven = calculate_breakeven_points(
+        bs_calculations['call_strike'],
+        bs_calculations['put_strike'],
+        call_price,
+        put_price,
+        is_true_straddle
+    )
     
     # Create the table rows
     rows = []
