@@ -233,20 +233,31 @@ def calculate_straddle_profit(current_price, strike_price, call_price, put_price
         'Contract P/L': contract_profits
     })
 
-# Calculate breakeven points for straddle
-def calculate_breakeven_points(strike_price, total_premium):
+# Calculate breakeven points for straddle/strangle
+def calculate_breakeven_points(call_strike, put_strike, call_price, put_price, is_straddle):
     """
-    Calculate breakeven points for a straddle strategy
+    Calculate exact breakeven points where Contract P/L is zero
     
     Parameters:
-    strike_price: Strike price for both options
-    total_premium: Total premium paid for both options
+    call_strike: Strike price for call option
+    put_strike: Strike price for put option
+    call_price: Premium paid for call option
+    put_price: Premium paid for put option
+    is_straddle: Boolean indicating if this is a true straddle
     
     Returns:
     Tuple of lower and upper breakeven points
     """
-    lower_breakeven = strike_price - total_premium
-    upper_breakeven = strike_price + total_premium
+    if is_straddle:
+        # For straddle (same strike price)
+        strike = call_strike  # same as put_strike
+        total_premium = call_price + put_price
+        lower_breakeven = strike - total_premium
+        upper_breakeven = strike + total_premium
+    else:
+        # For strangle (different strikes)
+        lower_breakeven = put_strike - (call_price + put_price)
+        upper_breakeven = call_strike + (call_price + put_price)
     
     return lower_breakeven, upper_breakeven
 
@@ -918,13 +929,14 @@ def update_results(n_clicks, expiry_date, call_data, put_data, stock_price_data,
         # Total premium paid
         total_premium = call_price + put_price
         
-        # Calculate breakeven points
-        if is_true_straddle:
-            lower_breakeven, upper_breakeven = calculate_breakeven_points(strike_price, total_premium)
-        else:
-            # For a strangle, breakeven points are different
-            lower_breakeven = put_strike_price - put_price
-            upper_breakeven = call_strike_price + call_price
+        # Calculate exact breakeven points where Contract P/L is zero
+        lower_breakeven, upper_breakeven = calculate_breakeven_points(
+            call_strike, 
+            put_strike, 
+            call_price, 
+            put_price, 
+            is_true_straddle
+        )
         
         # Calculate profit/loss at different stock prices
         price_range_min = max(0.1, current_price * 0.5)  # Avoid negative or zero prices
