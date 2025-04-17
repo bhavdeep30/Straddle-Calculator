@@ -1521,8 +1521,8 @@ def create_bs_pricing_table(bs_calculations, days):
             else:
                 stock_price_display = f"${stock_price:.2f} (Breakeven)"
         elif is_current:
-            # Current price
-            row_style = {'backgroundColor': colors['accent'], 'color': colors['text'], 'fontWeight': 'bold'}
+            # Current price - white background with black text
+            row_style = {'backgroundColor': '#ffffff', 'color': '#000000', 'fontWeight': 'bold'}
         elif abs(stock_price - current_price) < current_price * 0.02:  # Within 2% of current price
             row_style = {'backgroundColor': colors['panel'], 'color': colors['text']}
         else:
