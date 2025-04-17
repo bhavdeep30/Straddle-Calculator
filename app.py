@@ -190,16 +190,18 @@ def calculate_theoretical_prices(current_price, straddle_strike, straddle_put_st
     })
 
 # Calculate straddle strategy profit at different stock prices
-def calculate_straddle_profit(current_price, strike_price, call_price, put_price, price_range):
+def calculate_straddle_profit(current_price, call_strike, put_strike, call_price, put_price, price_range, is_straddle):
     """
-    Calculate profit/loss for a straddle strategy at different stock prices
+    Calculate profit/loss for a straddle/strangle strategy at different stock prices
     
     Parameters:
     current_price: Current stock price
-    strike_price: Strike price for both call and put
+    call_strike: Strike price for call option
+    put_strike: Strike price for put option
     call_price: Premium paid for call option
     put_price: Premium paid for put option
     price_range: Array of stock prices to calculate profit/loss
+    is_straddle: Boolean indicating if this is a true straddle
     
     Returns:
     DataFrame with stock prices and corresponding profit/loss
@@ -210,28 +212,62 @@ def calculate_straddle_profit(current_price, strike_price, call_price, put_price
     call_profits = []
     put_profits = []
     contract_profits = []
+    is_breakeven = []  # Track if price is a breakeven point
+    
+    # Calculate breakeven points
+    lower_breakeven, upper_breakeven = calculate_breakeven_points(
+        call_strike, put_strike, call_price, put_price, is_straddle
+    )
     
     for price in price_range:
-        # At expiration
-        call_profit = max(0, price - strike_price) - call_price
-        put_profit = max(0, strike_price - price) - put_price
+        # Calculate option profits
+        call_profit = max(0, price - call_strike) - call_price
+        put_profit = max(0, put_strike - price) - put_price
         total_profit = call_profit + put_profit
         
         # Calculate contract value (multiply by 100)
         contract_profit = total_profit * 100
         
+        # Check if this price is a breakeven point (within $0.01)
+        is_be = abs(total_profit) < 0.01
+        
         profits.append(total_profit)
         call_profits.append(call_profit)
         put_profits.append(put_profit)
         contract_profits.append(contract_profit)
+        is_breakeven.append(is_be)
     
-    return pd.DataFrame({
+    # Create DataFrame with additional breakeven info
+    profit_df = pd.DataFrame({
         'Stock Price': price_range,
         'Profit/Loss': profits,
         'Call P/L': call_profits,
         'Put P/L': put_profits,
-        'Contract P/L': contract_profits
+        'Contract P/L': contract_profits,
+        'Is Breakeven': is_breakeven
     })
+    
+    # Add breakeven points explicitly if they're not in the price range
+    be_points = [lower_breakeven, upper_breakeven]
+    for be_price in be_points:
+        if be_price not in profit_df['Stock Price'].values:
+            call_profit = max(0, be_price - call_strike) - call_price
+            put_profit = max(0, put_strike - be_price) - put_price
+            total_profit = call_profit + put_profit
+            
+            profit_df.loc[len(profit_df)] = {
+                'Stock Price': be_price,
+                'Profit/Loss': total_profit,
+                'Call P/L': call_profit,
+                'Put P/L': put_profit,
+                'Contract P/L': total_profit * 100,
+                'Is Breakeven': True
+            }
+    
+    # Sort by stock price and reset index
+    profit_df = profit_df.sort_values('Stock Price').reset_index(drop=True)
+    
+    return profit_df
 
 # Calculate breakeven points for straddle/strangle
 def calculate_breakeven_points(call_strike, put_strike, call_price, put_price, is_straddle):
@@ -1061,13 +1097,15 @@ def update_results(n_clicks, expiry_date, call_data, put_data, stock_price_data,
             put_profits.append(put_profit)
             contract_profits.append(contract_profit)
         
-        profit_df = pd.DataFrame({
-            'Stock Price': price_range,
-            'Profit/Loss': profits,
-            'Call P/L': call_profits,
-            'Put P/L': put_profits,
-            'Contract P/L': contract_profits
-        })
+        profit_df = calculate_straddle_profit(
+            current_price,
+            call_strike,
+            put_strike,
+            call_price,
+            put_price,
+            price_range,
+            is_true_straddle
+        )
         
         # Create the profit/loss graph
         fig = go.Figure()
