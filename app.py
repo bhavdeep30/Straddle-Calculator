@@ -1356,7 +1356,7 @@ def update_results(n_clicks, expiry_date, call_data, put_data, stock_price_data,
                             'verticalAlign': 'middle',
                             'display': 'inline-block',
                             'position': 'relative',
-                            'top': '4px'
+                            'top': '2px'
                         })
                     ], style={'margin': '5px 0', 'lineHeight': '1.5'}),
                 ]),
